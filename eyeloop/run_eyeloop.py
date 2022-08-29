@@ -9,8 +9,8 @@ import numpy as np
 
 import eyeloop.config as config
 from eyeloop.engine.engine import Engine
-from eyeloop.extractors.DAQ import DAQ_extractor
-from eyeloop.extractors.frametimer import FPS_extractor
+from eyeloop.extractors.DAQ import DaqExtractor
+from eyeloop.extractors.frametimer import FpsExtractor
 
 from eyeloop.utilities.argument_parser import Arguments
 from eyeloop.utilities.file_manager import File_Manager
@@ -31,7 +31,6 @@ class EyeLoop:
     """
 
     def __init__(self, args, logger=None):
-
         welcome("Server")
 
         config.arguments = Arguments(args)
@@ -62,8 +61,8 @@ class EyeLoop:
 
         config.engine = Engine(self)
 
-        fps_counter = FPS_extractor()
-        data_acquisition = DAQ_extractor(config.file_manager.new_folderpath)
+        fps_counter = FpsExtractor()
+        data_acquisition = DaqExtractor(config.file_manager.new_folderpath)
 
         file_path = config.arguments.extractors
 

@@ -2,8 +2,10 @@ import json
 import logging
 from pathlib import Path
 
+from eyeloop.extractors.extractor import Extractor
 
-class DAQ_extractor:
+
+class DaqExtractor(Extractor):
     def __init__(self, output_dir):
         self.output_dir = output_dir
         self.datalog_path = Path(output_dir, f"datalog.json")
@@ -26,8 +28,6 @@ class DAQ_extractor:
         except ValueError:
             pass
         self.fetch(core)
-        #return
-        #logging.debug("DAQ_extractor.release() called")
 
     # def set_digital_line(channel, value):
     # digital_output = PyDAQmx.Task()
