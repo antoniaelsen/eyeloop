@@ -1,10 +1,7 @@
 import logging
 import time
-from typing import Optional
 from os.path import dirname, abspath
 import glob, os
-
-import cv2
 
 import eyeloop.config as config
 from eyeloop.constants.engine_constants import *
@@ -14,11 +11,10 @@ from eyeloop.utilities.general_operations import to_int, tuple_int
 logger = logging.getLogger(__name__)
 PARAMS_DIR = f"{dirname(dirname(abspath(__file__)))}/engine/params"
 
+
 class Engine:
     def __init__(self, eyeloop):
-
         self.live = True  # Access this to check if Core is running.
-
         self.eyeloop = eyeloop
         self.model = config.arguments.model  # Used for assigning appropriate circular model.
 
@@ -30,10 +26,8 @@ class Engine:
             self.iterate = self.track
 
         self.angle = 0
-
-        self.cr_processor_1 = Shape(type = 2, n = 1)
-        self.cr_processor_2 = Shape(type = 2, n = 2)
         self.pupil_processor = Shape()
+        self.cr_processors = [Shape(type = 2, n = 1) for x in range(2)]
 
         #   Via "gui", assign "refresh_pupil" to function "processor.refresh_source"
         #   when the pupil has been selected.
@@ -45,6 +39,8 @@ class Engine:
         logger.info(f"loading extractors: {extractors}")
         self.extractors = extractors
 
+        for extractor in self.extractors:
+            extractor.activate()
 
     def run_extractors(self) -> None:
         """
@@ -76,6 +72,12 @@ class Engine:
 
         self.run_extractors()
 
+    def construct_param_dict(self):
+        param_dict = { "pupil" : [self.pupil_processor.binarythreshold, self.pupil_processor.blur] }
+        for i in range(len(self.cr_processors)):
+            param_dict[f'cr_{i}'] = [self.cr_processors[i].binarythreshold, self.cr_processors[i].blur]
+        return param_dict
+
     def arm(self, width, height, image) -> None:
         self.width, self.height = width, height
         config.graphical_user_interface.arm(width, height)
@@ -89,11 +91,9 @@ class Engine:
             logger.info("(success) blink calibration loaded")
 
         if config.arguments.clear == False or config.arguments.params != "":
-
             try:
                 if config.arguments.params != "":
                     latest_params = max(glob.glob(config.arguments.params), key=os.path.getctime)
-
                     print(config.arguments.params + " loaded")
 
                 else:
@@ -102,45 +102,32 @@ class Engine:
                 params_ = np.load(latest_params, allow_pickle=True).tolist()
 
                 self.pupil_processor.binarythreshold, self.pupil_processor.blur = params_["pupil"][0], params_["pupil"][1]
+                for i in range(len(self.cr_processors)):
+                    self.cr_processors[i].binarythreshold, self.cr_processors[i].blur = params_[f'cr_{i}'][0], params_[f'cr_{i}'][1]
 
-                self.cr_processor_1.binarythreshold, self.cr_processor_1.blur = params_["cr1"][0], params_["cr1"][1]
-                self.cr_processor_2.binarythreshold, self.cr_processor_2.blur = params_["cr2"][0], params_["cr2"][1]
-
-                print("(!) Parameters reloaded. Run --clear 1 to prevent this.")
-
-
-                param_dict = {
-                "pupil" : [self.pupil_processor.binarythreshold, self.pupil_processor.blur],
-                "cr1" : [self.cr_processor_1.binarythreshold, self.cr_processor_1.blur],
-                "cr2" : [self.cr_processor_2.binarythreshold, self.cr_processor_2.blur]
-                }
-
+                logger.warn("(!) Parameters reloaded. Run --clear 1 to prevent this.")
+                param_dict = self.construct_param_dict()
                 logger.info(f"loaded parameters:\n{param_dict}")
-
-                return
 
             except:
                 pass
-
-
+            
         filtered_image = image[np.logical_and((image < 220), (image > 30))]
         self.pupil_processor.binarythreshold = np.min(filtered_image) * 1 + np.median(filtered_image) * .1#+ 50
-        self.cr_processor_1.binarythreshold = self.cr_processor_2.binarythreshold = float(np.min(filtered_image)) * .7 + 150
+        for i in range(len(self.cr_processors)):
+            self.cr_processors[i].binarythreshold = float(np.min(filtered_image)) * .7 + 150
+
         if (filtered_image.size > 0):
             self.pupil_processor.binarythreshold = np.min(filtered_image) * 1 + np.median(filtered_image) * .1 #+ 50
-            self.cr_processor_1.binarythreshold = self.cr_processor_2.binarythreshold = float(np.min(filtered_image)) * .7 + 150
+            for i in range(len(self.cr_processors)):
+                self.cr_processors[i].binarythreshold = float(np.min(filtered_image)) * .7 + 150
 
-        param_dict = {
-        "pupil" : [self.pupil_processor.binarythreshold, self.pupil_processor.blur],
-        "cr1" : [self.cr_processor_1.binarythreshold, self.cr_processor_1.blur],
-        "cr2" : [self.cr_processor_2.binarythreshold, self.cr_processor_2.blur]
-        }
 
+        param_dict = self.construct_param_dict()
         logger.info(f"loaded parameters:\n{param_dict}")
 
 
     def blink_sampled(self, t:int = 1):
-
         if t == 1:
             if config.blink_i% 20 == 0:
                 print(f"calibrating blink detector {round(config.blink_i/config.blink.shape[0]*100,1)}%")
@@ -184,11 +171,9 @@ class Engine:
             self.pupil_processor.fit_model.params = None
             logger.info("Blink detected.")
         else:
-
             self.pupil_processor.track(img)
-
-            self.cr_processor_1.track(img)
-        #self.cr_processor_2.track(img.copy(), img)
+            for i in range(len(self.cr_processors)):
+                self.cr_processors[i].track(img)
 
 
         try:
@@ -223,9 +208,9 @@ class Engine:
 
         param_dict = {
         "pupil" : [self.pupil_processor.binarythreshold, self.pupil_processor.blur],
-        "cr1" : [self.cr_processor_1.binarythreshold, self.cr_processor_1.blur],
-        "cr2" : [self.cr_processor_2.binarythreshold, self.cr_processor_2.blur]
         }
+        for i in range(len(self.cr_processors)):
+            param_dict[f'cr_{i}'] = [self.cr_processors[i].binarythreshold, self.cr_processors[i].blur]
 
         path = f"{config.file_manager.new_folderpath}/params_{self.dataout['time']}.npy"
         np.save(path, param_dict)

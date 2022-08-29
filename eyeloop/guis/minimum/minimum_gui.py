@@ -63,41 +63,66 @@ class GUI:
             self.tooltips[key]["src"] = cv2.imread(f'{dir_path}/graphics/{name}.png', 0)
         self.first_tool_tip = self.tooltips["0"]["src"]
 
-        self._state = "adjustment"
+        self._state = "configuration"
         self.inquiry = "none"
         self.terminate = -1
-        self.update = self.adj_update#real_update
+        self.update = self.update_configure
         self.skip = 0
         self.first_run = True
+        self.cr_index = 0
+        self.cr_processor_index = 0
+        self.cr_processors = []
 
-        self.pupil_ = lambda _: False
-        self.cr1_ = lambda _: False
-        self.cr2_ = lambda _: False
+        self.crs_ = [lambda _: False]
 
-    def tip_mousecallback(self, event, x: int, y: int, flags, params) -> None:
+    def release(self):
+        # self.out.release()
+        cv2.destroyAllWindows()
+
+    def on_mouse_move(self, event, x, y, flags, params) -> None:
+        x = x % self.width
+        self.cursor = (x, y)
+
+    def on_mouse_move_tooltips(self, event, x: int, y: int, flags, params) -> None:
         if event == cv2.EVENT_LBUTTONDOWN:
             if 10 < y < 35:
                 if 20 < x < 209:
                     x -= 27
                     x = int(x / 36) + 1
 
+                    print(f'tooltip index: {x}')
                     self.update_tool_tip(x)
-
-    def mousecallback(self, event, x, y, flags, params) -> None:
-        x = x % self.width
-        self.cursor = (x, y)
-
-    def release(self):
-        # self.out.release()
-        cv2.destroyAllWindows()
-
-    def remove_mousecallback(self) -> None:
-        cv2.setMouseCallback(WINDOW_CONFIGURATION, lambda *args: None)
-        cv2.setMouseCallback(WINDOW_TOOLTIP, lambda *args: None)
 
     def update_tool_tip(self, index: int, error: bool = False) -> None:
         key = str(index) if not error else f'{str(index)}_error'
         cv2.imshow(WINDOW_TOOLTIP, self.tooltips[key]["src"])
+
+    def add_mouse_events(self) -> None:
+        try:
+            cv2.setMouseCallback(WINDOW_CONFIGURATION, self.on_mouse_move)
+            cv2.setMouseCallback(WINDOW_TOOLTIP, self.on_mouse_move_tooltips)
+        except:
+            logger.error("Could not bind mouse-buttons")
+
+    def remove_mouse_events(self) -> None:
+        cv2.setMouseCallback(WINDOW_CONFIGURATION, lambda *args: None)
+        cv2.setMouseCallback(WINDOW_TOOLTIP, lambda *args: None)
+
+    def init(self, width: int, height: int):
+        cv2.namedWindow(WINDOW_BINARY)
+        cv2.namedWindow(WINDOW_CONFIGURATION)
+        cv2.namedWindow(WINDOW_TOOLTIP)
+        cv2.moveWindow(WINDOW_BINARY, 105 + width, 100)
+        cv2.moveWindow(WINDOW_CONFIGURATION, 100, 100)
+        cv2.moveWindow(WINDOW_TOOLTIP, 100, height + 148)
+ 
+        self.add_mouse_events()
+
+    def destroy(self):
+        self.remove_mouse_events()
+        cv2.destroyWindow(WINDOW_CONFIGURATION)
+        cv2.destroyWindow(WINDOW_BINARY)
+        cv2.destroyWindow(WINDOW_TOOLTIP)
 
     def key_listener(self, key: int) -> None:
         try:
@@ -108,29 +133,26 @@ class GUI:
         if self.inquiry == "track":
             if "y" == key:
                 print("Initiating tracking..")
-                self.remove_mousecallback()
-                cv2.destroyWindow(WINDOW_CONFIGURATION)
-                cv2.destroyWindow(WINDOW_BINARY)
-                cv2.destroyWindow(WINDOW_TOOLTIP)
+                self.destroy()
 
-                cv2.imshow("TRACKING", self.bin_stock)
-                cv2.moveWindow("TRACKING", 100, 100)
+                cv2.imshow(WINDOW_TRACKING, self.bin_stock)
+                cv2.moveWindow(WINDOW_TRACKING, 100, 100)
 
                 self._state = "tracking"
                 self.inquiry = "none"
-
-                self.update = self.real_update
-
+                self.update = self.update_track
                 config.engine.activate()
-
                 return
+
             elif "n" == key:
                 print("Adjustments resumed.")
-                self._state = "adjustment"
+                self._state = "configuration"
                 self.inquiry = "none"
                 return
 
-        if self._state == "adjustment":
+        if self._state == "configuration":
+            current_cr_processor = self.cr_processors[self.cr_processor_index]
+
             if key == "p":
                 config.engine.angle -= 3
 
@@ -141,11 +163,9 @@ class GUI:
                 try:
                     # config.engine.pupil = self.cursor
                     self.pupil_processor.reset(self.cursor)
-                    self.pupil_ = self.pupil
-
                     self.update_tool_tip(4)
-
                     print("Pupil selected.\nAdjust binarization via R/F (threshold) and T/G (smoothing).")
+
                 except Exception as e:
                     self.update_tool_tip(3, True)
                     logger.info(f"pupil selection failed; {e}")
@@ -153,14 +173,10 @@ class GUI:
             elif "2" == key:
                 try:
 
-                    self.cr_processor_1.reset(self.cursor)
-                    self.cr1_ = self.cr_1
-
-                    self.current_cr_processor = self.cr_processor_1
-
+                    current_cr_processor.reset(self.cursor)
+                    self.cr_processor_index = 0
                     self.update_tool_tip(2)
-
-                    print("Corneal reflex selected.\nAdjust binarization via W/S (threshold) and E/D (smoothing).")
+                    print("Corneal reflex 1 selected.\nAdjust binarization via W/S (threshold) and E/D (smoothing).")
 
                 except Exception as e:
                     self.update_tool_tip(1, True)
@@ -169,12 +185,10 @@ class GUI:
             elif "3" == key:
                 try:
                     self.update_tool_tip(2)
-                    self.cr_processor_2.reset(self.cursor)
-                    self.cr2_ = self.cr_2
+                    self.cr_processor_index = 1
+                    current_cr_processor.reset(self.cursor)
 
-                    self.current_cr_processor = self.cr_processor_2
-
-                    print("\nCorneal reflex selected.")
+                    print("\nCorneal reflex 2 selected.")
                     print("Adjust binarization via W/S (threshold) and E/D (smoothing).")
 
                 except:
@@ -187,40 +201,33 @@ class GUI:
                 self.inquiry = "track"
 
             elif "w" == key:
-
-                self.current_cr_processor.binarythreshold += 1
-
-                print("Corneal reflex binarization threshold increased (%s)." % self.current_cr_processor.binarythreshold)
+                current_cr_processor.binarythreshold += 1
+                print("Corneal reflex binarization threshold increased (%s)." % current_cr_processor.binarythreshold)
 
             elif "s" == key:
-
-                self.current_cr_processor.binarythreshold -= 1
-                print("Corneal reflex binarization threshold decreased (%s)." % self.current_cr_processor.binarythreshold)
+                current_cr_processor.binarythreshold -= 1
+                print("Corneal reflex binarization threshold decreased (%s)." % current_cr_processor.binarythreshold)
 
             elif "e" == key:
-
-                self.current_cr_processor.blur = [x + 2 for x in self.current_cr_processor.blur]
-                print("Corneal reflex blurring increased (%s)." % self.current_cr_processor.blur)
+                current_cr_processor.blur = [x + 2 for x in current_cr_processor.blur]
+                print("Corneal reflex blurring increased (%s)." % current_cr_processor.blur)
 
             elif "d" == key:
-
-                if self.current_cr_processor.blur[0] > 1:
-                    self.current_cr_processor.blur = [x - 2 for x in self.current_cr_processor.blur]
-                print("Corneal reflex blurring decreased (%s)." % self.current_cr_processor.blur)
+                if current_cr_processor.blur[0] > 1:
+                    current_cr_processor.blur = [x - 2 for x in current_cr_processor.blur]
+                print("Corneal reflex blurring decreased (%s)." % current_cr_processor.blur)
 
             elif "r" == key:
-
                 self.pupil_processor.binarythreshold += 1
                 print("Pupil binarization threshold increased (%s)." % self.pupil_processor.binarythreshold)
+
             elif "f" == key:
 
                 self.pupil_processor.binarythreshold -= 1
                 print("Pupil binarization threshold decreased (%s)." % self.pupil_processor.binarythreshold)
 
             elif "t" == key:
-
                 self.pupil_processor.blur = [x + 2 for x in self.pupil_processor.blur]
-
                 print("Pupil blurring increased (%s)." % self.pupil_processor.blur)
 
             elif "g" == key:
@@ -233,29 +240,19 @@ class GUI:
             config.engine.release()
 
     def arm(self, width: int, height: int) -> None:
-        self.fps = np.round(1/config.arguments.fps, 2)
-
+        self.frequency_track = np.round(1/config.arguments.fps, 2)
         self.pupil_processor = config.engine.pupil_processor
 
         self.cr_index = 0
-        self.current_cr_processor = config.engine.cr_processor_1  # primary corneal reflection
-        self.cr_processor_1 = config.engine.cr_processor_1
-        self.cr_processor_2 = config.engine.cr_processor_2
+        self.cr_processor_index = 0  # primary corneal reflection
+        self.cr_processors = config.engine.cr_processors
 
         self.width, self.height = width, height
         self.binary_width = max(width, 300)
         self.binary_height = max(height, 200)
 
         # Initialize windows
-        cv2.namedWindow(WINDOW_BINARY)
-        cv2.namedWindow(WINDOW_CONFIGURATION)
-        cv2.namedWindow(WINDOW_TOOLTIP)
-
-        try:
-            cv2.setMouseCallback(WINDOW_CONFIGURATION, self.mousecallback)
-            cv2.setMouseCallback(WINDOW_TOOLTIP, self.tip_mousecallback)
-        except:
-            logger.error("Could not bind mouse-buttons")
+        self.init(width, height)
 
         # fourcc = cv2.VideoWriter_fourcc(*'MPEG')
         # output_vid = Path(config.file_manager.new_folderpath, "output.avi")
@@ -286,80 +283,49 @@ class GUI:
 
         cv2.imshow(WINDOW_CONFIGURATION, np.hstack((self.bin_stock, self.bin_stock)))
         cv2.imshow(WINDOW_BINARY, np.vstack((self.bin_stock, self.bin_stock)))
-
-        cv2.moveWindow(WINDOW_BINARY, 105 + width, 100)
-        cv2.moveWindow(WINDOW_CONFIGURATION, 100, 100)
-
         cv2.imshow(WINDOW_TOOLTIP, self.first_tool_tip)
 
-        cv2.moveWindow(WINDOW_TOOLTIP, 100, height + 148)
-        try:
-            cv2.setMouseCallback(WINDOW_CONFIGURATION, self.mousecallback)
-            cv2.setMouseCallback(WINDOW_TOOLTIP, self.tip_mousecallback)
-        except:
-            print("Could not bind mouse-buttons.")
+    def draw_cross(self, source: np.ndarray, point: tuple, color: tuple) -> None:
+        source[to_int(point[1] - 3):to_int(point[1] + 4), to_int(point[0])] = color
+        source[to_int(point[1]), to_int(point[0] - 3):to_int(point[0] + 4)] = color
 
-    def place_cross(self, source: np.ndarray, point: tuple, color: tuple) -> None:
-        try:
-            source[to_int(point[1] - 3):to_int(point[1] + 4), to_int(point[0])] = color
-            source[to_int(point[1]), to_int(point[0] - 3):to_int(point[0] + 4)] = color
-        except:
-            pass
-
-
-    def update_record(self, frame_preview) -> None:
-        cv2.imshow(WINDOW_RECORDING, frame_preview)
-        if cv2.waitKey(1) == ord('q'):
-            config.engine.release()
-
-    def skip_track(self):
-        self.update = self.real_update
-
-
-    def pupil(self, source_rgb):
+    def draw_pupil(self, source_rgb):
         try:
             pupil_center, pupil_width, pupil_height, pupil_angle = self.pupil_processor.fit_model.params
 
             cv2.ellipse(source_rgb, tuple_int(pupil_center), tuple_int((pupil_width, pupil_height)), pupil_angle, 0, 360, red, 1)
-            self.place_cross(source_rgb, pupil_center, red)
+            self.draw_cross(source_rgb, pupil_center, red)
             return True
         except Exception as e:
             logger.info(f"pupil not found: {e}")
             return False
 
-    def cr_1(self, source_rgb):
-        try:
-            #cr_center, cr_width, cr_height, cr_angle = params = self.cr_processor_1.fit_model.params
+    def draw_corneal_reflection(self, source_rgb, index):
+        if (index >= len(self.cr_processors)):
+            logger.warn(f'Error processing corneal reflection #{index} - no processor')
+            return 
 
-            #cv2.ellipse(source_rgb, tuple_int(cr_center), tuple_int((cr_width, cr_height)), cr_angle, 0, 360, green, 1)
-            self.place_cross(source_rgb, self.cr_processor_1.center, green)
+        try:
+            cr_center, cr_width, cr_height, cr_angle = params = self.cr_processors[index].fit_model.params
+            cv2.ellipse(source_rgb, tuple_int(cr_center), tuple_int((cr_width, cr_height)), cr_angle, 0, 360, green, 1)
+            self.draw_cross(source_rgb, self.cr_processors[index].center, green)
             return True
         except Exception as e:
-            logger.info(f"cr1 func: {e}")
+            logger.warn(f'Error processing corneal reflection #{index} - {e}')
             return False
 
-    def cr_2(self, source_rgb):
-        try:
-            #cr_center, cr_width, cr_height, cr_angle = params = self.cr_processor_2.fit_model.params
+    def skip_track(self):
+        self.update = self.update_track
 
-            #cv2.ellipse(source_rgb, tuple_int(cr_center), tuple_int((cr_width, cr_height)), cr_angle, 0, 360, green, 1)
-            self.place_cross(source_rgb, self.cr_processor_2.center, green)
-            return True
-        except Exception as e:
-            logger.info(f"cr2 func: {e}")
-            return False
-
-    def adj_update(self, img):
+    def update_configure(self, img):
         source_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
-        # if self.pupil_(source_rgb):
         self.bin_P = self.bin_stock.copy()
 
-        if self.pupil_(source_rgb):
+        if self.draw_pupil(source_rgb):
             self.bin_P[0:20, 0:self.binary_width] = self.bin_stock_txt_selected
         else:
             self.bin_P[0:20, 0:self.binary_width] = self.bin_stock_txt
-
 
         try:
             pupil_area = self.pupil_processor.source
@@ -372,12 +338,11 @@ class GUI:
             logger.warn(f'Failed to calculate binarization pupil')
             pass
 
-        self.cr1_(source_rgb)
-        self.cr2_(source_rgb)
-
+        self.draw_corneal_reflection(source_rgb, self.cr_processor_index)
         self.bin_CR = self.bin_stock.copy()
+
         try:
-            cr_area = self.current_cr_processor.source
+            cr_area = self.cr_processors[self.cr_processor_index].source
             offset_y = int((self.binary_height - cr_area.shape[0]) / 2)
             offset_x = int((self.binary_width - cr_area.shape[1]) / 2)
             self.bin_CR[offset_y:min(offset_y + cr_area.shape[0], self.binary_height),
@@ -397,16 +362,21 @@ class GUI:
         if self.first_run:
             self.first_run = False
 
+    def update_record(self, frame_preview) -> None:
+        cv2.imshow(WINDOW_RECORDING, frame_preview)
+        if cv2.waitKey(1) == ord('q'):
+            config.engine.release()
 
-    def real_update(self, img) -> None:
+    def update_track(self, img) -> None:
         source_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-        self.pupil_(source_rgb)
-        self.cr1_(source_rgb)
-        self.cr2_(source_rgb)
+
+        self.draw_pupil(source_rgb)
+        for i in range(len(self.cr_processors)):
+            self.draw_corneal_reflection(source_rgb, i)
 
         cv2.imshow(WINDOW_TRACKING, source_rgb)
 
-        threading.Timer(self.fps, self.skip_track).start() #run feed every n secs (n=1)
+        threading.Timer(self.frequency_track, self.skip_track).start() #run feed every n secs (n=1)
         self.update = lambda _: None
 
         if cv2.waitKey(1) == ord("q"):

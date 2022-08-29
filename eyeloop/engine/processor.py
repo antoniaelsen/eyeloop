@@ -1,29 +1,28 @@
 import cv2
-
+from enum import Enum
 import eyeloop.config as config
 from eyeloop.constants.processor_constants import *
 from eyeloop.engine.models.circular import Circle
 from eyeloop.engine.models.ellipsoid import Ellipse
 from eyeloop.utilities.general_operations import to_int, tuple_int
-import time
 import logging
 
 logger = logging.getLogger(__name__)
 
-class Center_class():
-    def fit(self, r):
+class ProcessorType(Enum):
+    PUPIL = 1
+    CORNEAL_REFLECTION = 2
 
+class Center():
+    def fit(self, r):
         self.params = tuple(np.mean(r, axis = 0))
         return self.params
 
 class Shape():
-    def __init__(self, type = 1, n = 0):
-
+    def __init__(self, type = ProcessorType.PUPIL, n = 0):
         self.active = False
         self.center = -1
-
         self.walkout_offset = 0
-
         self.binarythreshold = -1
         self.blur = [3, 3]
         self.type = type
@@ -33,9 +32,7 @@ class Shape():
         self.type_entry = None
         self.track = lambda x:None
 
-
-
-        if type == 1:
+        if type == ProcessorType.PUPIL:
             self.artefact = lambda _:None
             self.type_entry = "pupil"
             self.thresh = self.pupil_thresh
@@ -55,6 +52,7 @@ class Shape():
             self.walkout = self.pupil_walkout
 
             self.track = self.track_
+
         else:
             self.walkout = self.cr_walkout
             self.type_entry = f"cr_{n}"
@@ -64,7 +62,8 @@ class Shape():
             self.expand = 1.2
             self.artefact = lambda _:None
             #self.artefact = self.artefact_
-            self.fit_model = Center_class()#Circle(self)
+            # self.fit_model = Center() #Circle(self)
+            self.fit_model = Circle(self)
 
             self.min_radius = 1
             self.max_radius = 20 #change according to video size or argument
@@ -86,7 +85,6 @@ class Shape():
         #self.source[:] =
 
     def reset(self, center):
-
         self.active = True
         self.margin = 0
         self.walkout_offset = 0
@@ -107,10 +105,9 @@ class Shape():
         #self.img = img
 
 
-        # Performs a simple binarization and applies a smoothing gaussian kernel.
+        # Performs a simple binzrization and applies a smoothing gaussian kernel.
 
         self.thresh() #either pupil or cr
-
         self.fit_() #gets fit model
 
 
@@ -156,23 +153,18 @@ class Shape():
 
     def fit(self):
         try:
-
             r = self.walkout()
-
-
             self.center = self.fit_model.fit(r)
-
             params = self.fit_model.params
-
             #self.artefact(params)
 
             config.engine.dataout[self.type_entry] = self.fit_model.params#params
-        except IndexError:
 
-            logger.info(f"fit index error")
+        except IndexError as e:
+            logger.info(f"fit index error - {e}")
             self.center_adj()
-        except Exception as e:
 
+        except Exception as e:
             logger.info(f"fit-func error: {e}")
             self.center_adj()
 
@@ -200,8 +192,6 @@ class Shape():
         np.clip(crop_list, self.min_radius, self.max_radius, out = crop_list)
 
     def pupil_walkout(self):
-
-
         #diag_matrix = main_diagonal[:canvas_.shape[0], :canvas_.shape[1]]
 
         try:
@@ -318,8 +308,6 @@ class Shape():
         return self.cond(r, crop_list)#rx[cond_], ry[cond_]#rx, ry
 
     def cr_walkout(self):
-
-
         #diag_matrix = main_diagonal[:canvas_.shape[0], :canvas_.shape[1]]
 
         try:
