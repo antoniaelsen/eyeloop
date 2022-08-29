@@ -56,8 +56,8 @@ class Engine:
             try:
                 extractor.fetch(self)
             except Exception as e:
-                print("Error in module class: {}".format(extractor.__name__))
-                print("Error message: ", e)
+                logger.info("Error in module class: {}".format(extractor.__name__))
+                logger.info("Error message: ", e)
 
     def record(self) -> None:
         """
@@ -87,7 +87,7 @@ class Engine:
         if config.arguments.blinkcalibration != "":
             config.blink = np.load(config.arguments.blinkcalibration)
             self.blink_sampled = lambda _:None
-            logger.info("(success) blink calibration loaded")
+            logger.info(f'(success) blink calibration loaded')
 
         if config.arguments.clear == False or config.arguments.params != "":
 
@@ -95,7 +95,7 @@ class Engine:
                 if config.arguments.params != "":
                     latest_params = max(glob.glob(config.arguments.params), key=os.path.getctime)
 
-                    print(config.arguments.params + " loaded")
+                    logger.info(config.arguments.params + " loaded")
 
                 else:
                     latest_params = max(glob.glob(PARAMS_DIR + "/*.npy"), key=os.path.getctime)
@@ -107,7 +107,7 @@ class Engine:
                 self.cr_processor_1.binarythreshold, self.cr_processor_1.blur = params_["cr1"][0], params_["cr1"][1]
                 self.cr_processor_2.binarythreshold, self.cr_processor_2.blur = params_["cr2"][0], params_["cr2"][1]
 
-                print("(!) Parameters reloaded. Run --clear 1 to prevent this.")
+                logger.info("(!) Parameters reloaded. Run --clear 1 to prevent this.")
 
 
                 param_dict = {
@@ -127,11 +127,14 @@ class Engine:
         filtered_image = image[np.logical_and((image < 220), (image > 30))]
         self.pupil_processor.binarythreshold = np.min(filtered_image) * 1 + np.median(filtered_image) * .1#+ 50
         self.cr_processor_1.binarythreshold = self.cr_processor_2.binarythreshold = float(np.min(filtered_image)) * .7 + 150
+        if (filtered_image.size > 0):
+            self.pupil_processor.binarythreshold = np.min(filtered_image) * 1 + np.median(filtered_image) * .1 #+ 50
+            self.cr_processor_1.binarythreshold = self.cr_processor_2.binarythreshold = float(np.min(filtered_image)) * .7 + 150
 
         param_dict = {
-        "pupil" : [self.pupil_processor.binarythreshold, self.pupil_processor.blur],
-        "cr1" : [self.cr_processor_1.binarythreshold, self.cr_processor_1.blur],
-        "cr2" : [self.cr_processor_2.binarythreshold, self.cr_processor_2.blur]
+            "pupil" : [self.pupil_processor.binarythreshold, self.pupil_processor.blur],
+            "cr1" : [self.cr_processor_1.binarythreshold, self.cr_processor_1.blur],
+            "cr2" : [self.cr_processor_2.binarythreshold, self.cr_processor_2.blur]
         }
 
         logger.info(f"loaded parameters:\n{param_dict}")
@@ -141,12 +144,12 @@ class Engine:
 
         if t == 1:
             if config.blink_i% 20 == 0:
-                print(f"calibrating blink detector {round(config.blink_i/config.blink.shape[0]*100,1)}%")
+                logger.info(f"calibrating blink detector {round(config.blink_i/config.blink.shape[0]*100,1)}%")
         else:
             logger.info("(success) blink detection calibrated")
             path = f"{config.file_manager.new_folderpath}/blinkcalibration_{self.dataout['time']}.npy"
             np.save(path, config.blink)
-            print("blink calibration file saved")
+            logger.info("blink calibration file saved")
 
     def track(self, img) -> None:
         """
@@ -173,16 +176,17 @@ class Engine:
             "time": time.time()
         }
 
-        if np.abs(mean_img - np.mean(config.blink[np.nonzero(config.blink)])) > 10:
-
+        mean_blink = np.mean(config.blink)
+        # blinks_nonzero = config.blink[np.nonzero(config.blink)]
+        # if np.abs(mean_img - np.mean(blinks_nonzero)) > 10:
+        if np.abs(mean_img - mean_blink) > 10:
             self.dataout["blink"] = 1
             self.pupil_processor.fit_model.params = None
             logger.info("Blink detected.")
         else:
-
             self.pupil_processor.track(img)
-
             self.cr_processor_1.track(img)
+
         #self.cr_processor_2.track(img.copy(), img)
 
 
@@ -224,7 +228,7 @@ class Engine:
 
         path = f"{config.file_manager.new_folderpath}/params_{self.dataout['time']}.npy"
         np.save(path, param_dict)
-        print("Parameters saved")
+        logger.info("Parameters saved")
 
         self.live = False
         config.graphical_user_interface.release()

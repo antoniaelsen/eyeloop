@@ -25,6 +25,12 @@ class IMPORTER:
         else:
             self.rotate_ = lambda img, _: None
 
+        print(f'Importer ---------------')
+        print(f'    scale: {self.scale}')
+        print(f'    rotate: {config.arguments.rotation == 1}')
+        print(f'    video: {self.vid_path}')
+        print(f'    save: {config.arguments.save == 1}')
+
     def arm(self, width, height, image):
 
         self.dimensions = tuple_int((width * self.scale, height * self.scale))
