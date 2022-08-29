@@ -13,14 +13,16 @@
 
 EyeLoop is a Python 3-based eye-tracker tailored specifically to dynamic, closed-loop experiments on consumer-grade hardware. This software is actively maintained: Users are encouraged to contribute to its development.
 
-## Features ##
+## Features
+
 - [x] **High-speed** > 1000 Hz on non-specialized hardware (no dedicated processing units necessary).
 - [x] Modular, readable, **customizable**.
 - [x] **Open-source**, and entirely Python 3.
 - [x] **Works on any platform**, easy installation.
 - [x] **Actively maintained**.
 
-## Overview ##
+## Overview
+
 - [How it works](#how-it-works)
 - [Getting started](#getting-started)
 - [Your first experiment](#designing-your-first-experiment)
@@ -28,9 +30,10 @@ EyeLoop is a Python 3-based eye-tracker tailored specifically to dynamic, closed
 - [User interface](#graphical-user-interface)
 - [Authors](#authors)
 - [Examples](https://github.com/simonarvin/eyeloop/blob/master/examples)
-- [*EyeLoop Playground*](https://github.com/simonarvin/eyeloop_playground)
+- [_EyeLoop Playground_](https://github.com/simonarvin/eyeloop_playground)
 
-## How it works ##
+## How it works
+
 <p align="center">
 <img src="https://github.com/simonarvin/eyeloop/blob/master/misc/imgs/software%20logic.svg?raw=true" width = "500">
 </p>
@@ -41,43 +44,48 @@ EyeLoop consists of two functional domains: the engine and the optional modules.
 - Data acquisition
 - Importing video sequences to the engine
 
-> The modules import or extract data from the engine, and are therefore called *Importers* and *Extractors*, respectively.
+> The modules import or extract data from the engine, and are therefore called _Importers_ and _Extractors_, respectively.
 
-One of EyeLoop's most appealing features is its modularity: Experiments are built simply by combining modules with the core Engine. Thus, the Engine has one task only: to compute eye-tracking data based on an *imported* sequence, and offer the generated data for *extraction*.
+One of EyeLoop's most appealing features is its modularity: Experiments are built simply by combining modules with the core Engine. Thus, the Engine has one task only: to compute eye-tracking data based on an _imported_ sequence, and offer the generated data for _extraction_.
 
 > How does [the Engine](https://github.com/simonarvin/eyeloop/blob/master/eyeloop/engine/README.md) work?\
 > How does [the Importer](https://github.com/simonarvin/eyeloop/blob/master/eyeloop/importers/README.md) work?\
 > How does [the Extractor](https://github.com/simonarvin/eyeloop/blob/master/eyeloop/extractors/README.md) work?
 
-## Getting started ##
+## Getting started
 
-### Installation ###
+### Installation
+
+Requirements:
+
+- tkinter support (mac: `brew install python-tk`)
 
 Install EyeLoop by cloning the repository:
+
 ```
 git clone https://github.com/simonarvin/eyeloop.git
 ```
 
->Dependencies: ```python -m pip install -r requirements.txt```
+> Dependencies: `python -m pip install -r requirements.txt`
 
->Using pip:
-> ```pip install .```
+> Using pip:
+> `pip install .`
 
 You may want to use a Conda or Python virtual environment when
 installing `eyeloop`, to avoid mixing up with your system dependencies.
 
->Using pip and a virtual environment:
+> Using pip and a virtual environment:
 
-> ```python -m venv venv```
+> `python -m venv venv`
 
-> ```source venv/bin/activate```
+> `source venv/bin/activate`
 
-> ```(venv) pip install .```
+> `(venv) pip install .`
 
 Alternatively:
 
->- numpy: ```python pip install numpy```
->- opencv: ```python pip install opencv-python```
+> - numpy: `python pip install numpy`
+> - opencv: `python pip install opencv-python`
 
 To download full examples with footage, check out EyeLoop's playground repository:
 
@@ -87,34 +95,41 @@ git clone https://github.com/simonarvin/eyeloop_playground.git
 
 ---
 
-### Initiation ###
+### Initiation
 
 EyeLoop is initiated through the command-line utility `eyeloop`.
+
 ```
 eyeloop
 ```
-To access the video sequence, EyeLoop must be connected to an appropriate *importer class* module. Usually, the default opencv importer class (*cv*) is sufficient. For some machine vision cameras, however, a vimba-based importer (*vimba*) is neccessary.
+
+To access the video sequence, EyeLoop must be connected to an appropriate _importer class_ module. Usually, the default opencv importer class (_cv_) is sufficient. For some machine vision cameras, however, a vimba-based importer (_vimba_) is neccessary.
+
 ```
 eyeloop --importer cv/vimba
 ```
-> [Click here](https://github.com/simonarvin/eyeloop/blob/master/eyeloop/importers/README.md) for more information on *importers*.
 
-To perform offline eye-tracking, we pass the video argument ```--video``` with the path of the video sequence:
+> [Click here](https://github.com/simonarvin/eyeloop/blob/master/eyeloop/importers/README.md) for more information on _importers_.
+
+To perform offline eye-tracking, we pass the video argument `--video` with the path of the video sequence:
+
 ```
 eyeloop --video [file]/[folder]
 ```
+
 <p align="right">
     <img src="https://github.com/simonarvin/eyeloop/blob/master/misc/imgs/models.svg?raw=true" align="right" height="150">
 </p>
 
-EyeLoop can be used on a multitude of eye types, including rodents, human and non-human primates. Specifically, users can suit their eye-tracking session to any species using the ```--model``` argument.
+EyeLoop can be used on a multitude of eye types, including rodents, human and non-human primates. Specifically, users can suit their eye-tracking session to any species using the `--model` argument.
 
 ```
 eyeloop --model ellipsoid/circular
 ```
+
 > In general, the ellipsoid pupil model is best suited for rodents, whereas the circular model is best suited for primates.
 
-To learn how to optimize EyeLoop for your video material, see [*EyeLoop Playground*](https://github.com/simonarvin/eyeloop_playground).
+To learn how to optimize EyeLoop for your video material, see [_EyeLoop Playground_](https://github.com/simonarvin/eyeloop_playground).
 
 To see all command-line arguments, pass:
 
@@ -122,24 +137,26 @@ To see all command-line arguments, pass:
 eyeloop --help
 ```
 
-## Designing your first experiment ##
+## Designing your first experiment
 
 <p align="center">
     <img src="https://github.com/simonarvin/eyeloop/blob/master/misc/imgs/setup.svg?raw=true" align="center" height="250">
 </p>
 
-In EyeLoop, experiments are built by stacking modules. By default, EyeLoop imports two base *extractors*, namely a FPS-counter and a data acquisition tool. To add custom extractors, e.g., for experimental purposes, use the argument tag ```--extractors```:
+In EyeLoop, experiments are built by stacking modules. By default, EyeLoop imports two base _extractors_, namely a FPS-counter and a data acquisition tool. To add custom extractors, e.g., for experimental purposes, use the argument tag `--extractors`:
 
 ```
 eyeloop --extractors [file_path]/p (where p = file prompt)
 ```
 
-Inside the *extractor* file, or a composite python file containing several *extractors*, define the list of *extractors* to be added:
+Inside the _extractor_ file, or a composite python file containing several _extractors_, define the list of _extractors_ to be added:
+
 ```python
 extractors_add = [extractor1, extractor2, etc]
 ```
 
-*Extractors* are instantiated by EyeLoop at start-up. Then, at every subsequent time-step, the *extractor's* ```fetch()``` function is called by the engine.
+_Extractors_ are instantiated by EyeLoop at start-up. Then, at every subsequent time-step, the _extractor's_ `fetch()` function is called by the engine.
+
 ```python
 class Extractor:
     def __init__(self) -> None:
@@ -147,20 +164,24 @@ class Extractor:
     def fetch(self, core) -> None:
         ...
 ```
-```fetch()``` gains access to all eye-tracking data in real-time via the *core* pointer.
 
-> [Click here](https://github.com/simonarvin/eyeloop/blob/master/eyeloop/extractors/README.md) for more information on *extractors*.
+`fetch()` gains access to all eye-tracking data in real-time via the _core_ pointer.
 
-### Open-loop example ###
+> [Click here](https://github.com/simonarvin/eyeloop/blob/master/eyeloop/extractors/README.md) for more information on _extractors_.
 
-As an example, we'll here design a simple *open-loop* experiment where the brightness of a PC monitor is linked to the phase of the sine wave function. We create anew python-file, say "*test_ex.py*", and in it define the sine wave frequency and phase using the instantiator:
+### Open-loop example
+
+As an example, we'll here design a simple _open-loop_ experiment where the brightness of a PC monitor is linked to the phase of the sine wave function. We create anew python-file, say "_test_ex.py_", and in it define the sine wave frequency and phase using the instantiator:
+
 ```python
 class Experiment:
     def __init__(self) -> None:
         self.frequency = ...
         self.phase = 0
 ```
-Then, by using ```fetch()```, we shift the phase of the sine wave function at every time-step, and use this to control the brightness of a cv-render.
+
+Then, by using `fetch()`, we shift the phase of the sine wave function at every time-step, and use this to control the brightness of a cv-render.
+
 ```python
     ...
     def fetch(self, engine) -> None:
@@ -171,39 +192,41 @@ Then, by using ```fetch()```, we shift the phase of the sine wave function at ev
 ```
 
 To add our test extractor to EyeLoop, we'll need to define an extractors_add array:
+
 ```python
 extractors_add = [Experiment()]
 ```
 
 Finally, we test the experiment by running command:
+
 ```
 eyeloop --extractors path/to/test_ex.py
 ```
 
 > See [Examples](https://github.com/simonarvin/eyeloop/blob/master/examples) for demo recordings and experimental designs.
 
-> For extensive test data, see [*EyeLoop Playground*](https://github.com/simonarvin/eyeloop_playground)
+> For extensive test data, see [_EyeLoop Playground_](https://github.com/simonarvin/eyeloop_playground)
 
+## Data
 
-## Data ##
 EyeLoop produces a json-datalog for each eye-tracking session. The datalog's first column is the timestamp.
 The next columns define the pupil (if tracked):
 
-```((center_x, center_y), radius1, radius2, angle)```
+`((center_x, center_y), radius1, radius2, angle)`
 
 The next columns define the corneal reflection (if tracked):
 
-```((center_x, center_y), radius1, radius2, angle)```
+`((center_x, center_y), radius1, radius2, angle)`
 
 The next columns contain any data produced by custom Extractor modules
 
+## Graphical user interface
 
-## Graphical user interface ##
-The default graphical user interface in EyeLoop is [*minimum-gui*.](https://github.com/simonarvin/eyeloop/blob/master/eyeloop/guis/minimum/README.md)
+The default graphical user interface in EyeLoop is [_minimum-gui_.](https://github.com/simonarvin/eyeloop/blob/master/eyeloop/guis/minimum/README.md)
 
 > EyeLoop is compatible with custom graphical user interfaces through its modular logic. [Click here](https://github.com/simonarvin/eyeloop/blob/master/eyeloop/guis/README.md) for instructions on how to build your own.
 
-## Running unit tests ##
+## Running unit tests
 
 Install testing requirements by running in a terminal:
 
@@ -213,12 +236,14 @@ Then run tox: `tox`
 
 Reports and results will be outputted to `/tests/reports`
 
+## Known issues
 
-## Known issues ##
-- [ ] Respawning/freezing windows when running *minimum-gui* in Ubuntu.
+- [ ] Respawning/freezing windows when running _minimum-gui_ in Ubuntu.
 
-## References ##
+## References
+
 If you use any of this code or data, please cite [Arvin et al. 2020] ([preprint](https://www.biorxiv.org/content/10.1101/2020.07.03.186387v1)).
+
 ```latex
 @article {Arvin2020.07.03.186387,
 	author = {Arvin, Simon and Rasmussen, Rune and Yonehara, Keisuke},
@@ -233,13 +258,15 @@ If you use any of this code or data, please cite [Arvin et al. 2020] ([preprint]
 }
 ```
 
-## License ##
+## License
+
 This project is licensed under the GNU General Public License v3.0. Note that the software is provided "as is", without warranty of any kind, express or implied.
 
-## Authors ##
+## Authors
 
 **Lead Developer:**
 Simon Arvin, sarv@dandrite.au.dk
+
 <p align="right">
     <img src="https://github.com/simonarvin/eyeloop/blob/master/misc/imgs/constant.svg?raw=true" align="right" height="180">
     </p>
@@ -254,6 +281,7 @@ Simon Arvin, sarv@dandrite.au.dk
 Keisuke Yonehera, keisuke.yonehara@dandrite.au.dk</br></br>
 
 ---
+
 <p align="center">
     <img src="https://github.com/simonarvin/eyeloop/blob/master/misc/imgs/aarhusuniversity.svg?raw=true" align="center" height="40">&nbsp;&nbsp;&nbsp;&nbsp;
     <img src="https://github.com/simonarvin/eyeloop/blob/master/misc/imgs/dandrite.svg?raw=true" align="center" height="40">&nbsp;&nbsp;&nbsp;&nbsp;
