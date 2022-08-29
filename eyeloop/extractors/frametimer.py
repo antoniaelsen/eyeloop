@@ -18,10 +18,12 @@ class FPS_extractor:
 
 
     def get_fps(self):
-        print(f"    Processing {config.importer.frame - self.last_frame} frames per second.")
+        frames = config.importer.frame - self.last_frame
+        # print(f"    Processing {frames} frames per second.")
         self.last_frame = config.importer.frame
         self.thread = threading.Timer(1, self.get_fps)
         self.thread.start()
+        return frames
 
 
     def release(self, core):

@@ -77,7 +77,6 @@ class Engine:
         self.run_extractors()
 
     def arm(self, width, height, image) -> None:
-
         self.width, self.height = width, height
         config.graphical_user_interface.arm(width, height)
         self.center = (width//2, height//2)
@@ -127,6 +126,9 @@ class Engine:
         filtered_image = image[np.logical_and((image < 220), (image > 30))]
         self.pupil_processor.binarythreshold = np.min(filtered_image) * 1 + np.median(filtered_image) * .1#+ 50
         self.cr_processor_1.binarythreshold = self.cr_processor_2.binarythreshold = float(np.min(filtered_image)) * .7 + 150
+        if (filtered_image.size > 0):
+            self.pupil_processor.binarythreshold = np.min(filtered_image) * 1 + np.median(filtered_image) * .1 #+ 50
+            self.cr_processor_1.binarythreshold = self.cr_processor_2.binarythreshold = float(np.min(filtered_image)) * .7 + 150
 
         param_dict = {
         "pupil" : [self.pupil_processor.binarythreshold, self.pupil_processor.blur],
@@ -173,8 +175,11 @@ class Engine:
             "time": time.time()
         }
 
-        if np.abs(mean_img - np.mean(config.blink[np.nonzero(config.blink)])) > 10:
-
+        # if np.abs(mean_img - np.mean(config.blink[np.nonzero(config.blink)])) > 10:
+        mean_blink = np.mean(config.blink)
+        # blinks_nonzero = config.blink[np.nonzero(config.blink)]
+        # if np.abs(mean_img - np.mean(blinks_nonzero)) > 10:
+        if np.abs(mean_img - mean_blink) > 10:
             self.dataout["blink"] = 1
             self.pupil_processor.fit_model.params = None
             logger.info("Blink detected.")
