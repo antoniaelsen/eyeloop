@@ -57,7 +57,8 @@ class EyeLoop:
         #    print("\n(!) NO BLINK DETECTION. Run 'eyeloop --blink 1' to calibrate\n")
 
 
-        from eyeloop.guis.minimum.minimum_gui import GUI
+        # from eyeloop.guis.minimum.minimum_gui import GUI
+        from eyeloop.guis.tkinter.tkinter_gui import GUI
         config.graphical_user_interface = GUI()
 
         config.engine = Engine(self)
