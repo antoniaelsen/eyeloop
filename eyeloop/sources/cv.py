@@ -1,24 +1,24 @@
 import logging
+import math
 from pathlib import Path
 from typing import Optional, Callable
 
 import cv2
 
 import eyeloop.config as config
-from eyeloop.importers.importer import IMPORTER
+from eyeloop.sources.source import Source
 
 logger = logging.getLogger(__name__)
 
 
-class Importer(IMPORTER):
-
-    def __init__(self) -> None:
-        super().__init__()
+# TODO(aelsen): should really be broken out into live cam and video CV classes
+class CvSource(Source):
+    def __init__(self, on_frame) -> None:
+        super().__init__(on_frame)
         self.route_frame: Optional[Callable] = None  # Dynamically assigned at runtime depending on input type
-
-    def first_frame(self) -> None:
+    
+    def init(self) -> None:
         self.vid_path = Path(config.arguments.video)
-
 
         # load first frame
         if str(self.vid_path.name) == "0" or self.vid_path.is_file():  # or stream
@@ -43,7 +43,6 @@ class Importer(IMPORTER):
                     "Make sure that the video path is correct, or that your webcam is plugged in and compatible with opencv.")
 
         elif self.vid_path.is_dir():
-
             config.file_manager.input_folderpath = self.vid_path
 
             config.file_manager.input_folderpath = self.vid_path
@@ -62,10 +61,11 @@ class Importer(IMPORTER):
         else:
             raise ValueError(f"Video path at {self.vid_path} is not a file or directory!")
 
-        self.arm(width, height, image)
+        width = math.floor(width)
+        height = math.floor(height)
+        return (width, height), image
 
     def route(self) -> None:
-        self.first_frame()
         while True:
             if self.route_frame is not None:
                 self.route_frame()
@@ -74,21 +74,17 @@ class Importer(IMPORTER):
 
     def proceed(self, image) -> None:
         image = self.resize(image)
-        self.rotate_(image, config.engine.angle)
-        config.engine.iterate(image)
+        self.rotate_(image, self.angle)
+        self.on_frame(image)
         self.save_(image)
         self.frame += 1
 
     def route_sequence_sing(self) -> None:
-
         image = config.file_manager.read_image(self.frame)
-
         self.proceed(image[..., 0])
 
     def route_sequence_flat(self) -> None:
-
         image = config.file_manager.read_image(self.frame)
-
         self.proceed(image)
 
     def route_cam(self) -> None:
@@ -107,7 +103,7 @@ class Importer(IMPORTER):
             self.release()
 
     def release(self) -> None:
-        logger.debug(f"cv.Importer.release() called")
+        logger.debug(f"cv.Source.release() called")
         if self.capture is not None:
             self.capture.release()
 

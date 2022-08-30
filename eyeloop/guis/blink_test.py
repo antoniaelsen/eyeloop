@@ -15,7 +15,7 @@ class GUI:
         return
 
     def update(self, img):
-        if config.importer.frame == self.last_frame:
+        if config.source.frame == self.last_frame:
 
             stack = np.hstack(tuple(self.frames))
             cv2.imshow("Blink_test", stack)
@@ -35,7 +35,7 @@ class GUI:
 
             config.engine.release()
         else:
-            if config.importer.frame in self.pick:
+            if config.source.frame in self.pick:
                 self.frames.append(img)
 
         #    cv2.imshow("Blink_test", img)

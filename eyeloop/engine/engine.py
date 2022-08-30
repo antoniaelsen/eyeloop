@@ -1,3 +1,4 @@
+from enum import Enum
 import logging
 import time
 from os.path import dirname, abspath
@@ -6,41 +7,81 @@ import glob, os
 import eyeloop.config as config
 from eyeloop.constants.engine_constants import *
 from eyeloop.engine.processor import Shape
+from eyeloop.sources.source import Source
 from eyeloop.utilities.general_operations import to_int, tuple_int
 
 logger = logging.getLogger(__name__)
 PARAMS_DIR = f"{dirname(dirname(abspath(__file__)))}/engine/params"
 
 
+class State(Enum):
+    TRACK = 0
+    RECORD = 1
+
 class Engine:
-    def __init__(self, eyeloop):
-        self.live = True  # Access this to check if Core is running.
-        self.eyeloop = eyeloop
+    def __init__(self, source: Source, gui = None):
+        self.gui = gui(on_angle=self.update_angle, on_quit=self.release)
+        self.source = source(on_frame=self.on_frame)
+
         self.model = config.arguments.model  # Used for assigning appropriate circular model.
 
         self.extractors = []
+        self.extractor_data = []
+        self.state = State.RECORD if config.arguments.tracking == 0 else State.TRACK
 
-        if config.arguments.tracking == 0:  # Recording mode. --tracking 0
-            self.iterate = self.record
-        else:  # Tracking mode. --tracking 1 (default)
-            self.iterate = self.track
-
+        self.frame_i = 0
         self.angle = 0
         self.pupil_processor = Shape()
         self.cr_processors = [Shape(type = 2, n = 1) for x in range(2)]
 
-        #   Via "gui", assign "refresh_pupil" to function "processor.refresh_source"
-        #   when the pupil has been selected.
-        self.refresh_pupil = lambda x: None
+    def activate(self) -> None:
+        """
+        Activates all extractors.
+        The extractor activate() function is optional.
+        """
+        for key, extractor in self.extractors.items():
+            try:
+                extractor.activate()
+            except AttributeError:
+                logger.warning(f"Extractor {key} has no activate() method")
 
-    def load_extractors(self, extractors: list = None) -> None:
-        if extractors is None:
-            extractors = []
-        logger.info(f"loading extractors: {extractors}")
-        self.extractors = extractors
+
+        self.arm()
+
+    def release(self) -> None:
+        """
+        Releases/deactivates all running process, i.e., importers, extractors.
+        """
+        param_dict = {
+            "pupil" : [self.pupil_processor.binarythreshold, self.pupil_processor.blur],
+        }
+        for i in range(len(self.cr_processors)):
+            param_dict[f'cr_{i}'] = [self.cr_processors[i].binarythreshold, self.cr_processors[i].blur]
+
+        path = f"{config.file_manager.new_folderpath}/params_{self.dataout['time']}.npy"
+        np.save(path, param_dict)
+        print("Parameters saved")
+
+        self.gui.release()
+        self.source.release()
 
         for extractor in self.extractors:
-            extractor.activate()
+            try:
+                extractor.release(self)
+            except AttributeError:
+                logger.warning(f"Extractor {extractor} has no release() method")
+            else:
+                pass
+
+    def load_extractors(self, extractors: dict = None) -> None:
+        if extractors is None:
+            extractors = {}
+            return
+        logger.info(f"loading extractors: {extractors}")
+        self.extractors = extractors
+        self.extractor_data = {}
+        for key in self.extractors.keys():
+            self.extractor_data[key] = None
 
     def run_extractors(self) -> None:
         """
@@ -48,29 +89,12 @@ class Engine:
         Assign additional extractors to core engine via eyeloop.py.
         """
 
-        for extractor in self.extractors:
+        for key, value in self.extractors.items():
             try:
-                extractor.fetch(self)
+                self.extractor_data[key] = value.fetch(self)
             except Exception as e:
-                print("Error in module class: {}".format(extractor.__name__))
+                print("Error in module class: {}".format(key))
                 print("Error message: ", e)
-
-    def record(self) -> None:
-        """
-        Runs Core engine in record mode. Timestamps all frames in data output log.
-        Runs gui update_record function with no tracking.
-        Argument -s 1
-        """
-
-        timestamp = time.time()
-
-        self.dataout = {
-            "time": timestamp
-        }
-
-        config.graphical_user_interface.update_record(self.source)
-
-        self.run_extractors()
 
     def construct_param_dict(self):
         param_dict = { "pupil" : [self.pupil_processor.binarythreshold, self.pupil_processor.blur] }
@@ -78,12 +102,22 @@ class Engine:
             param_dict[f'cr_{i}'] = [self.cr_processors[i].binarythreshold, self.cr_processors[i].blur]
         return param_dict
 
-    def arm(self, width, height, image) -> None:
-        self.width, self.height = width, height
-        config.graphical_user_interface.arm(width, height)
-        self.center = (width//2, height//2)
+    def update_angle(self, inc):
+        self.angle += inc
+        self.source.angle = self.angle # TODO(aelsen) not great
 
-        self.iterate(image)
+    def arm(self) -> None:
+        (width, height), image = self.source.init()
+        self.source.arm(width, height, image)
+        self.gui.arm(
+            (width, height),
+            self.pupil_processor,
+            self.cr_processors
+        )
+        self.center = (width//2, height//2)
+        self.width, self.height = width, height
+
+        self.on_frame(image)
 
         if config.arguments.blinkcalibration != "":
             config.blink = np.load(config.arguments.blinkcalibration)
@@ -126,7 +160,6 @@ class Engine:
         param_dict = self.construct_param_dict()
         logger.info(f"loaded parameters:\n{param_dict}")
 
-
     def blink_sampled(self, t:int = 1):
         if t == 1:
             if config.blink_i% 20 == 0:
@@ -137,7 +170,28 @@ class Engine:
             np.save(path, config.blink)
             print("blink calibration file saved")
 
-    def track(self, img) -> None:
+    def on_frame(self, frame) -> None:
+        self.frame_i += 1
+        if (self.state == State.RECORD):
+            self.record(frame)
+        else:
+            self.track(frame)
+        
+        self.run_extractors()
+
+    def run(self) -> None:
+        self.source.route()
+
+    def record(self, frame) -> None:
+        """
+        Runs Core engine in record mode. Timestamps all frames in data output log.
+        """
+        self.dataout = { "time": time.time() }
+
+        self.gui.update(frame)
+
+
+    def track(self, frame) -> None:
         """
         Executes the tracking algorithm on the pupil and corneal reflections.
         First, blinking is analyzed.
@@ -146,7 +200,7 @@ class Engine:
         Fourth, pupil is detected.
         Finally, data is logged and extractors are run.
         """
-        mean_img = np.mean(img)
+        mean_img = np.mean(frame)
         try:
 
             config.blink[config.blink_i] = mean_img
@@ -171,61 +225,9 @@ class Engine:
             self.pupil_processor.fit_model.params = None
             logger.info("Blink detected.")
         else:
-            self.pupil_processor.track(img)
+            self.pupil_processor.track(frame)
             for i in range(len(self.cr_processors)):
-                self.cr_processors[i].track(img)
+                self.cr_processors[i].track(frame)
 
-
-        try:
-            config.graphical_user_interface.update(img)
-        except Exception as e:
-            logger.exception("Did you assign the graphical user interface (GUI) correctly? Attempting to release()")
-            self.release()
-            return
-
-        self.run_extractors()
-
-    def activate(self) -> None:
-        """
-        Activates all extractors.
-        The extractor activate() function is optional.
-        """
-
-        for extractor in self.extractors:
-            try:
-                extractor.activate()
-            except AttributeError:
-                logger.warning(f"Extractor {extractor} has no activate() method")
-
-    def release(self) -> None:
-        """
-        Releases/deactivates all running process, i.e., importers, extractors.
-        """
-        try:
-            config.graphical_user_interface.out.release()
-        except:
-            pass
-
-        param_dict = {
-        "pupil" : [self.pupil_processor.binarythreshold, self.pupil_processor.blur],
-        }
-        for i in range(len(self.cr_processors)):
-            param_dict[f'cr_{i}'] = [self.cr_processors[i].binarythreshold, self.cr_processors[i].blur]
-
-        path = f"{config.file_manager.new_folderpath}/params_{self.dataout['time']}.npy"
-        np.save(path, param_dict)
-        print("Parameters saved")
-
-        self.live = False
-        config.graphical_user_interface.release()
-
-
-        for extractor in self.extractors:
-            try:
-                extractor.release(self)
-            except AttributeError:
-                logger.warning(f"Extractor {extractor} has no release() method")
-            else:
-                pass
-
-        config.importer.release()
+        self.gui.update(frame)
+    

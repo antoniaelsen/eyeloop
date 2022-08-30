@@ -4,14 +4,13 @@ from pymba import Frame
 from pymba import Vimba
 
 import eyeloop.config as config
-from eyeloop.importers.importer import IMPORTER
+from eyeloop.sources.source import Source
 
 
 # For pymba documentation, see:
 # https://github.com/morefigs/pymba
 
-class Importer(IMPORTER):
-
+class VimbaSource(Source):
     def first_frame(self) -> None:
         # load first frame
         with Vimba() as vimba:

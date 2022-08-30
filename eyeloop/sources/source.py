@@ -5,15 +5,16 @@ import eyeloop.config as config
 from eyeloop.utilities.general_operations import tuple_int
 
 
-class IMPORTER:
-
-    def __init__(self):
-        self.live = True
+class Source:
+    def __init__(self, on_frame = None):
+        print(f'CREATING SOURCE')
+        self.on_frame = on_frame
         self.scale = config.arguments.scale
 
         self.frame = 0
         self.vid_path = config.arguments.video
         self.capture = None
+        self.angle = 0
 
         if config.arguments.save == 1:
             self.save_ = self.save
@@ -26,7 +27,6 @@ class IMPORTER:
             self.rotate_ = lambda img, _: None
 
     def arm(self, width, height, image):
-
         self.dimensions = tuple_int((width * self.scale, height * self.scale))
 
         width, height = self.dimensions
@@ -39,10 +39,7 @@ class IMPORTER:
             self.resize = self.resize_image
 
         self.resize(image)
-
         # image = self.rotate(image, self.ENGINE.angle)
-        
-        config.engine.arm(width, height, image)
 
     def rotate(self, image: np.ndarray, angle: int) -> np.ndarray:
         """
@@ -68,4 +65,3 @@ class IMPORTER:
 
     def release(self):
         self.release = lambda:None
-        config.engine.release()

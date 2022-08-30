@@ -49,7 +49,7 @@ EyeLoop consists of two functional domains: the engine and the optional modules.
 One of EyeLoop's most appealing features is its modularity: Experiments are built simply by combining modules with the core Engine. Thus, the Engine has one task only: to compute eye-tracking data based on an _imported_ sequence, and offer the generated data for _extraction_.
 
 > How does [the Engine](https://github.com/simonarvin/eyeloop/blob/master/eyeloop/engine/README.md) work?\
-> How does [the Importer](https://github.com/simonarvin/eyeloop/blob/master/eyeloop/importers/README.md) work?\
+> How does [the Source](https://github.com/simonarvin/eyeloop/blob/master/eyeloop/importers/README.md) work?\
 > How does [the Extractor](https://github.com/simonarvin/eyeloop/blob/master/eyeloop/extractors/README.md) work?
 
 ## Getting started
@@ -103,10 +103,10 @@ EyeLoop is initiated through the command-line utility `eyeloop`.
 eyeloop
 ```
 
-To access the video sequence, EyeLoop must be connected to an appropriate _importer class_ module. Usually, the default opencv importer class (_cv_) is sufficient. For some machine vision cameras, however, a vimba-based importer (_vimba_) is neccessary.
+To access the video sequence, EyeLoop must be connected to an appropriate _importer class_ module. Usually, the default opencv source class (_cv_) is sufficient. For some machine vision cameras, however, a vimba-based source (_vimba_) is neccessary.
 
 ```
-eyeloop --importer cv/vimba
+eyeloop --source cv/vimba
 ```
 
 > [Click here](https://github.com/simonarvin/eyeloop/blob/master/eyeloop/importers/README.md) for more information on _importers_.

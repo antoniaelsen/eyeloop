@@ -3,6 +3,7 @@ from pathlib import Path
 
 EYELOOP_DIR = Path(__file__).parent.parent
 PROJECT_DIR = EYELOOP_DIR.parent
+DEFAULT_FPS = 100
 
 
 class Arguments:
@@ -15,7 +16,7 @@ class Arguments:
         self.markers = None
         self.video = None
         self.output_dir = None
-        self.importer = None
+        self.source = None
         self.scale = None
         self.tracking = None
         self.model = None
@@ -32,8 +33,8 @@ class Arguments:
         parser.add_argument("-o", "--output_dir", default=str(PROJECT_DIR.joinpath("data").absolute()), type=str,
                             help="Specify output destination.")
         parser.add_argument("-c", "--config", default="0", type=str, help="Input a .pupt config file (preset).")
-        parser.add_argument("-i", "--importer", default="cv", type=str,
-                            help="Set import route of stream (cv, vimba, ...)")
+        parser.add_argument("-i", "--source", default="cv", type=str,
+                            help="Set source stream (cv, vimba, ...)")
         parser.add_argument("-sc", "--scale", default=1, type=float, help="Scale the stream (default: 1; 0-1)")
         parser.add_argument("-m", "--model", default="ellipsoid", type=str,
                             help="Set pupil model type (circular; ellipsoid = default).")
@@ -54,8 +55,8 @@ class Arguments:
         parser.add_argument("-rt", "--rotation", default=0, type=int,
                             help="Enable online rotation (yes/no, 1/0; default = 0)")
 
-        parser.add_argument("-fps", "--framerate", default=1, type=float,
-                            help="How often to update preview window  (default = 1/second)")
+        parser.add_argument("-fps", "--framerate", default=DEFAULT_FPS, type=float,
+                            help=f"How often to update preview window  (default = {DEFAULT_FPS} / second)")
 
         parser.add_argument("-cl", "--clear", default=0, type=float,
                             help="Clear parameters (yes/no, 1/0) - default = 0")
@@ -77,7 +78,7 @@ class Arguments:
         self.markers = parsed_args.markers
         self.video = Path(parsed_args.video.strip("\'\"")).absolute()  # Handle quotes used in argument
         self.output_dir = Path(parsed_args.output_dir.strip("\'\"")).absolute()
-        self.importer = parsed_args.importer.lower()
+        self.source = parsed_args.source.lower()
         self.scale = parsed_args.scale
         self.tracking = parsed_args.tracking
         self.model = parsed_args.model.lower()
@@ -112,8 +113,8 @@ class Arguments:
                     self.output_dir = Path(parameter).absolute()
 
                 elif parameter == "import":
-                    print("Importer preset: ", parameter)
-                    self.importer = parameter
+                    print("Source preset: ", parameter)
+                    self.source = parameter
                 elif parameter == "model":
                     print("Model preset: ", parameter)
                     self.model = parameter

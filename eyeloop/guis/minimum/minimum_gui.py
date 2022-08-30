@@ -54,7 +54,9 @@ tooltips = {
 }
 
 class GUI:
-    def __init__(self) -> None:
+    def __init__(self, on_angle = None, on_quit = None) -> None:
+        self.on_angle = on_angle
+        self.on_quit = on_quit
         self.tooltips = tooltips.copy()
         dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -73,10 +75,12 @@ class GUI:
         self.cr_processor_index = 0
         self.cr_processors = []
 
+        self.out = None
+
         self.crs_ = [lambda _: False]
 
+
     def release(self):
-        # self.out.release()
         cv2.destroyAllWindows()
 
     def on_mouse_move(self, event, x, y, flags, params) -> None:
@@ -90,7 +94,6 @@ class GUI:
                     x -= 27
                     x = int(x / 36) + 1
 
-                    print(f'tooltip index: {x}')
                     self.update_tool_tip(x)
 
     def update_tool_tip(self, index: int, error: bool = False) -> None:
@@ -141,7 +144,6 @@ class GUI:
                 self._state = "tracking"
                 self.inquiry = "none"
                 self.update = self.update_track
-                config.engine.activate()
                 return
 
             elif "n" == key:
@@ -154,14 +156,13 @@ class GUI:
             current_cr_processor = self.cr_processors[self.cr_processor_index]
 
             if key == "p":
-                config.engine.angle -= 3
+                self.on_angle(-3)
 
             elif key == "o":
-                config.engine.angle += 3
+                self.on_angle(+3)
 
             elif "1" == key:
                 try:
-                    # config.engine.pupil = self.cursor
                     self.pupil_processor.reset(self.cursor)
                     self.update_tool_tip(4)
                     print("Pupil selected.\nAdjust binarization via R/F (threshold) and T/G (smoothing).")
@@ -236,17 +237,17 @@ class GUI:
                 print("Pupil blurring decreased (%s)." % self.pupil_processor.blur)
 
         if "q" == key:
-            # Terminate tracking
-            config.engine.release()
+            self.on_quit()
 
-    def arm(self, width: int, height: int) -> None:
-        self.frequency_track = np.round(1/config.arguments.fps, 2)
-        self.pupil_processor = config.engine.pupil_processor
+    def arm(self, image_dimensions, pupil_processor, cr_processors = []) -> None:
+        self.frequency_track = np.round(1 / config.arguments.fps, 2)
+        self.pupil_processor = pupil_processor
 
         self.cr_index = 0
         self.cr_processor_index = 0  # primary corneal reflection
-        self.cr_processors = config.engine.cr_processors
+        self.cr_processors = cr_processors
 
+        width, height = image_dimensions
         self.width, self.height = width, height
         self.binary_width = max(width, 300)
         self.binary_height = max(height, 200)
@@ -254,9 +255,9 @@ class GUI:
         # Initialize windows
         self.init(width, height)
 
-        # fourcc = cv2.VideoWriter_fourcc(*'MPEG')
-        # output_vid = Path(config.file_manager.new_folderpath, "output.avi")
-        # self.out = cv2.VideoWriter(str(output_vid), fourcc, 50.0, (self.width, self.height))
+        fourcc = cv2.VideoWriter_fourcc(*'MPEG')
+        output_vid = Path(config.file_manager.new_folderpath, "output.avi")
+        self.out = cv2.VideoWriter(str(output_vid), fourcc, 50.0, (self.width, self.height))
 
         self.bin_stock = np.zeros((self.binary_height, self.binary_width))
         self.bin_P = self.bin_stock.copy()
@@ -365,7 +366,7 @@ class GUI:
     def update_record(self, frame_preview) -> None:
         cv2.imshow(WINDOW_RECORDING, frame_preview)
         if cv2.waitKey(1) == ord('q'):
-            config.engine.release()
+            self.on_quit()
 
     def update_track(self, img) -> None:
         source_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
@@ -380,4 +381,4 @@ class GUI:
         self.update = lambda _: None
 
         if cv2.waitKey(1) == ord("q"):
-            config.engine.release()
+            self.on_quit()

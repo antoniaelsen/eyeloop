@@ -14,11 +14,11 @@ class FpsExtractor(Extractor):
 
     def fetch(self, engine):
         delta = time.time() - self.last_time
-        frames = config.importer.frame - self.last_frame
+        frames = engine.frame_i - self.last_frame
         fps = math.floor(frames / delta)
-        print(f"Processing {fps} frames per second.")
         self.last_time = time.time()
-        self.last_frame = config.importer.frame
+        self.last_frame = engine.frame_i
+        # print(f"Processing {fps} frames per second.")
         return fps
 
     def release(self, core):

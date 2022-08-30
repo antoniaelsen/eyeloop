@@ -15,6 +15,7 @@ class ProcessorType(Enum):
 
 class Center():
     def fit(self, r):
+        # logger.info(f'Center - fit {r}')
         self.params = tuple(np.mean(r, axis = 0))
         return self.params
 
@@ -155,13 +156,15 @@ class Shape():
         try:
             r = self.walkout()
             self.center = self.fit_model.fit(r)
+            # print(f'Fit center: {self.center}')
             params = self.fit_model.params
+            # print(f'Fit params: {params}')
             #self.artefact(params)
 
             config.engine.dataout[self.type_entry] = self.fit_model.params#params
 
         except IndexError as e:
-            logger.info(f"fit index error - {e}")
+            # logger.info(f"fit index error - {e}")
             self.center_adj()
 
         except Exception as e:

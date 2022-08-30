@@ -10,8 +10,9 @@ import numpy as np
 import eyeloop.config as config
 from eyeloop.engine.engine import Engine
 from eyeloop.extractors.DAQ import DaqExtractor
-from eyeloop.extractors.frametimer import FpsExtractor
-
+from eyeloop.extractors.fps import FpsExtractor
+from eyeloop.guis.minimum.minimum_gui import GUI
+from eyeloop.sources.cv import CvSource
 from eyeloop.utilities.argument_parser import Arguments
 from eyeloop.utilities.file_manager import File_Manager
 from eyeloop.utilities.format_print import welcome
@@ -33,82 +34,56 @@ class EyeLoop:
     def __init__(self, args, logger=None):
         welcome("Server")
 
+        self.engine = None
+        self.gui = None
+        self.source = None
+
         config.arguments = Arguments(args)
         config.file_manager = File_Manager(output_root=config.arguments.output_dir, img_format = config.arguments.img_format)
         if logger is None:
             logger, logger_filename = setup_logging(log_dir=config.file_manager.new_folderpath, module_name="run_eyeloop")
+        
+        self.init()
 
-        #if config.arguments.blink == 0:
-        self.run()
-        #else:
-        #    self.test_blink()
-
-    def test_blink(self):
-        from eyeloop.guis.blink_test import GUI
-        config.graphical_user_interface = GUI()
-        config.engine = Engine(self)
-        self.run_importer()
-
-    def run(self):
-        #try:
-        #    config.blink = np.load(f"{EYELOOP_DIR}/blink_.npy")[0] * .8
-        #except:
-        #    print("\n(!) NO BLINK DETECTION. Run 'eyeloop --blink 1' to calibrate\n")
-
-
-        from eyeloop.guis.minimum.minimum_gui import GUI
-        config.graphical_user_interface = GUI()
-
-        config.engine = Engine(self)
-
+    def load_extractors(self, file_path):
         fps_counter = FpsExtractor()
         data_acquisition = DaqExtractor(config.file_manager.new_folderpath)
-
-        file_path = config.arguments.extractors
+        extractors = { "FpsExtractor": fps_counter, "DaqExtractor": data_acquisition }
 
         if file_path == "p":
             root = tk.Tk()
             root.withdraw()
             file_path = filedialog.askopenfilename()
 
-        extractors_add = []
-
         if file_path != "":
             try:
                 logger.info(f"including {file_path}")
                 sys.path.append(os.path.dirname(file_path))
-                module_import = os.path.basename(file_path).split(".")[0]
+                extractor_module_name = os.path.basename(file_path).split(".")[0]
 
-                extractor_module = importlib.import_module(module_import)
-                extractors_add = extractor_module.extractors_add
+                logger.info(f'importing extractor {extractor_module_name}')
+                extractor_module = importlib.import_module()
+                extractors[extractor_module_name] = extractor_module
 
             except Exception as e:
                 logger.info(f"extractors not included, {e}")
 
-        extractors_base = [fps_counter, data_acquisition]
-        extractors = extractors_add + extractors_base
+        return extractors
 
-        config.engine.load_extractors(extractors)
-
-        self.run_importer()
-
-    def run_importer(self):
-        try:
-            logger.info(f"Initiating tracking via Importer: {config.arguments.importer}")
-            importer_module = importlib.import_module(f"eyeloop.importers.{config.arguments.importer}")
-            config.importer = importer_module.Importer()
-            config.importer.route()
-
-            # exec(import_command, globals())
-
-        except ImportError:
-            logger.exception("Invalid importer selected")
+    def init(self):
+        #try:
+        #    config.blink = np.load(f"{EYELOOP_DIR}/blink_.npy")[0] * .8
+        #except:
+        #    print("\n(!) NO BLINK DETECTION. Run 'eyeloop --blink 1' to calibrate\n")
+        self.engine = Engine(source=CvSource, gui=GUI)
+        self.engine.load_extractors(self.load_extractors(config.arguments.extractors))
+        self.engine.activate()
+        self.engine.run()
 
 
 def main():
-    EyeLoop(sys.argv[1:], logger=None)
+    app = EyeLoop(sys.argv[1:], logger=None)
 
 
 if __name__ == '__main__':
-
     main()

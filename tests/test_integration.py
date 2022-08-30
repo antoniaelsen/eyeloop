@@ -59,6 +59,6 @@ class TestIntegration:
     #        run_eyeloop.EyeLoop(args=[])
     #    assert "Failed to initialize video stream" in str(excinfo.value)
 
-# Tests for each importer
+# Tests for each source
 
 # TODO Add tests that use that animal tag of the videos
