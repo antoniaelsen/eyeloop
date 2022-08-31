@@ -1,6 +1,7 @@
 import logging
 import math
 from pathlib import Path
+import time
 from typing import Optional, Callable
 
 import cv2
@@ -20,6 +21,8 @@ class CvStreamSource(Source):
     def init(self) -> None:
         self.camera_id = int(config.arguments.device)
         self.capture = cv2.VideoCapture(self.camera_id)
+        # self.capture.set(3, 640)
+        # self.capture.set(4, 480)
 
         # load first frame
         width = self.capture.get(cv2.CAP_PROP_FRAME_WIDTH)

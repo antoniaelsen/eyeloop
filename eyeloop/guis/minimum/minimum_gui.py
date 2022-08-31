@@ -20,7 +20,7 @@ WINDOW_CONFIGURATION = "Raw Video"
 WINDOW_TOOLTIP = "Instructions"
 WINDOW_TRACKING = "Tracking"
 WINDOW_RECORDING = "Recording"
-CV_IMAGE_PERIOD = 100
+CV_IMAGE_PERIOD = 1
 
 tooltips = {
     "0": {
@@ -365,6 +365,7 @@ class GUI:
         if (not key in data):
             return
         fps = data[key]
+        print(f"render fps {fps}")
         cv2.putText(frame, f'FPS: {fps}', (10, 15), font, .7, 1, 0, cv2.LINE_4)
 
     def update(self, frame, data):
@@ -390,9 +391,9 @@ class GUI:
         self.draw_corneal_reflection(frame_rgb, self.cr_processor_index)
         self.generate_corneal_reflection_binarization()
 
-        self.render_fps(frame_rgb, data)
+        self.render_fps(frame, data)
 
-        cv2.imshow(WINDOW_BINARY, np.vstack((self.bin_P, self.bin_CR)))
+        # cv2.imshow(WINDOW_BINARY, np.vstack((self.bin_P, self.bin_CR)))
         cv2.imshow(WINDOW_CONFIGURATION, frame_rgb)
 
         key = cv2.waitKey(CV_IMAGE_PERIOD)
@@ -421,5 +422,5 @@ class GUI:
         cv2.imshow(WINDOW_TRACKING, frame_rgb)
 
 
-        if cv2.waitKey(1) == ord("q"):
+        if cv2.waitKey(CV_IMAGE_PERIOD) == ord("q"):
             self.on_quit()

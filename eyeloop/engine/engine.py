@@ -202,7 +202,6 @@ class Engine:
         """
         mean_img = np.mean(frame)
         try:
-
             config.blink[config.blink_i] = mean_img
             config.blink_i += 1
             self.blink_sampled(1)
@@ -218,9 +217,10 @@ class Engine:
 
         # if np.abs(mean_img - np.mean(config.blink[np.nonzero(config.blink)])) > 10:
         mean_blink = np.mean(config.blink)
+        is_blinking = np.abs(mean_img - mean_blink) > 10
         # blinks_nonzero = config.blink[np.nonzero(config.blink)]
         # if np.abs(mean_img - np.mean(blinks_nonzero)) > 10:
-        if np.abs(mean_img - mean_blink) > 10:
+        if is_blinking:
             self.dataout["blink"] = 1
             self.pupil_processor.fit_model.params = None
             if (not self.blink_active):
