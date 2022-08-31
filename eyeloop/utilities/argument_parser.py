@@ -27,45 +27,43 @@ class Arguments:
     @staticmethod
     def parse_args(args):
         parser = argparse.ArgumentParser(description='Help list')
-        parser.add_argument("-v", "--video", default="0", type=str,
-                            help="Input a video sequence for offline processing.")
-
-        parser.add_argument("-o", "--output_dir", default=str(PROJECT_DIR.joinpath("data").absolute()), type=str,
-                            help="Specify output destination.")
+        parser.add_argument("-b", "--blink", default="", type=str,
+                            help="Load blink calibration file (.npy)")
         parser.add_argument("-c", "--config", default="0", type=str, help="Input a .pupt config file (preset).")
-        parser.add_argument("-i", "--source", default="cv", type=str,
-                            help="Set source stream (cv, vimba, ...)")
-        parser.add_argument("-sc", "--scale", default=1, type=float, help="Scale the stream (default: 1; 0-1)")
-        parser.add_argument("-m", "--model", default="ellipsoid", type=str,
-                            help="Set pupil model type (circular; ellipsoid = default).")
-        parser.add_argument("-ma", "--markers", default=0, type=int,
-                            help="Enable/disable artifact removing markers (0: disable/default; 1: enable)")
-        parser.add_argument("-tr", "--tracking", default=1, type=int,
-                            help="Enable/disable tracking (1/enabled: default).")
-
-        parser.add_argument("-ex", "--extractors", default="", type=str,
-                            help="Set file-path of extractor Python file. p = start file prompt.")
-
-        parser.add_argument("-imgf", "--img_format", default="frame_$.jpg", type=str,
-                            help="Set img format for import (default: frame_$.jpg where $ = 1, 2,...)")
-
-        parser.add_argument("-sv", "--save", default=1, type=int,
-                            help="Save video feed or not (yes/no, 1/0; default = 1)")
-
-        parser.add_argument("-rt", "--rotation", default=0, type=int,
-                            help="Enable online rotation (yes/no, 1/0; default = 0)")
 
         parser.add_argument("-fps", "--framerate", default=DEFAULT_FPS, type=float,
                             help=f"How often to update preview window  (default = {DEFAULT_FPS} / second)")
 
-        parser.add_argument("-cl", "--clear", default=0, type=float,
-                            help="Clear parameters (yes/no, 1/0) - default = 0")
+        parser.add_argument("-d", "--device", default=0, type=str,
+                            help="Camera device id, if streaming")
 
+        parser.add_argument("-m", "--model", default="ellipsoid", type=str,
+                            help="Set pupil model type (circular; ellipsoid = default).")
+        parser.add_argument("-o", "--output_dir", default=str(PROJECT_DIR.joinpath("data").absolute()), type=str,
+                            help="Specify output destination.")
         parser.add_argument("-p", "--params", default="", type=str,
                             help="Load pupil/cr parameter file (.npy)")
+        parser.add_argument("-r", "--rotation", default=0, type=int,
+                            help="Enable online rotation (yes/no, 1/0; default = 0)")
+        parser.add_argument("-s", "--scale", default=1, type=float, help="Scale the stream (default: 1; 0-1)")
+        parser.add_argument("-v", "--video", default="0", type=str,
+                            help="Input a video sequence for offline processing.")
+        parser.add_argument("-x", "--extractors", default="", type=str,
+                            help="Set file-path of extractor Python file. p = start file prompt.")
 
-        parser.add_argument("-b", "--blink", default="", type=str,
-                            help="Load blink calibration file (.npy)")
+        parser.add_argument("--clear", default=0, type=float,
+                            help="Clear parameters (yes/no, 1/0) - default = 0")
+        parser.add_argument("--img_format", default="frame_$.jpg", type=str,
+                            help="Set img format for import (default: frame_$.jpg where $ = 1, 2,...)")
+        parser.add_argument("--markers", default=0, type=int,
+                            help="Enable/disable artifact removing markers (0: disable/default; 1: enable)")
+        parser.add_argument("--save", default=1, type=int,
+                            help="Save video feed or not (yes/no, 1/0; default = 1)")
+        parser.add_argument("--source", default="cv", type=str,
+                            help="Set source stream (cv, vimba, ...)")
+        parser.add_argument("--tracking", default=1, type=int,
+                            help="Enable/disable tracking (1/enabled: default).")
+
 
         return parser.parse_args(args)
 
@@ -76,6 +74,7 @@ class Arguments:
             self.parse_config(self.config)
 
         self.markers = parsed_args.markers
+        self.device = parsed_args.device
         self.video = Path(parsed_args.video.strip("\'\"")).absolute()  # Handle quotes used in argument
         self.output_dir = Path(parsed_args.output_dir.strip("\'\"")).absolute()
         self.source = parsed_args.source.lower()

@@ -1,4 +1,5 @@
 from enum import Enum
+import math
 import os
 from pathlib import Path
 import time
@@ -19,7 +20,7 @@ WINDOW_CONFIGURATION = "Raw Video"
 WINDOW_TOOLTIP = "Instructions"
 WINDOW_TRACKING = "Tracking"
 WINDOW_RECORDING = "Recording"
-CV_IMAGE_PERIOD = 50
+CV_IMAGE_PERIOD = 100
 
 tooltips = {
     "0": {
@@ -106,7 +107,6 @@ class GUI:
         cv2.imshow(WINDOW_TOOLTIP, self.tooltips[key]["src"])
 
     def add_mouse_events(self) -> None:
-        print("ADDED MOUSE EVENTS")
         try:
             cv2.setMouseCallback(WINDOW_CONFIGURATION, self.on_mouse_move)
             cv2.setMouseCallback(WINDOW_TOOLTIP, self.on_mouse_move_tooltips)
@@ -121,9 +121,9 @@ class GUI:
         cv2.namedWindow(WINDOW_BINARY)
         cv2.namedWindow(WINDOW_CONFIGURATION)
         cv2.namedWindow(WINDOW_TOOLTIP)
-        cv2.moveWindow(WINDOW_BINARY, 105 + width, 100)
-        cv2.moveWindow(WINDOW_CONFIGURATION, 100, 100)
-        cv2.moveWindow(WINDOW_TOOLTIP, 100, height + 148)
+        cv2.moveWindow(WINDOW_BINARY, math.ceil(width / 2), 0)
+        cv2.moveWindow(WINDOW_CONFIGURATION, 0, 0)
+        cv2.moveWindow(WINDOW_TOOLTIP, 0, math.ceil(height / 2))
  
         self.add_mouse_events()
 
@@ -368,7 +368,6 @@ class GUI:
         cv2.putText(frame, f'FPS: {fps}', (10, 15), font, .7, 1, 0, cv2.LINE_4)
 
     def update(self, frame, data):
-        print(f"Track {self._state} {data}")
         if (self._state == GuiState.RECORDING):
             self.update_record(frame, data)
         elif (self._state == GuiState.TRACKING):

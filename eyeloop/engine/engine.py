@@ -151,17 +151,12 @@ class Engine:
                 pass
             
         filtered_image = image[np.logical_and((image < 220), (image > 30))]
-        self.pupil_processor.binarythreshold = np.min(filtered_image) * 1 + np.median(filtered_image) * .1#+ 50
+
         self.pupil_processor.set_dimensions((width, height))
+        self.pupil_processor.binarythreshold = np.min(filtered_image) * 1 + np.median(filtered_image) * .1 # + 50
         for i in range(len(self.cr_processors)):
-            self.cr_processors[i].binarythreshold = float(np.min(filtered_image)) * .7 + 150
             self.cr_processors[i].set_dimensions((width, height))
-
-        if (filtered_image.size > 0):
-            self.pupil_processor.binarythreshold = np.min(filtered_image) * 1 + np.median(filtered_image) * .1 #+ 50
-            for i in range(len(self.cr_processors)):
-                self.cr_processors[i].binarythreshold = float(np.min(filtered_image)) * .7 + 150
-
+            self.cr_processors[i].binarythreshold = float(np.min(filtered_image)) * .7 + 150
 
         param_dict = self.construct_param_dict()
         logger.info(f"loaded parameters:\n{param_dict}")
