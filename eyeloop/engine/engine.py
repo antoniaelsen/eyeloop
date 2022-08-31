@@ -21,8 +21,10 @@ class State(Enum):
 
 class Engine:
     def __init__(self, source: Source, gui = None):
-        self.gui = gui(on_angle=self.update_angle, on_quit=self.release)
         self.source = source(on_frame=self.on_frame)
+        self.gui = None
+        if (gui is not None):
+            self.gui = gui(on_angle=self.update_angle, on_quit=self.release)
 
         self.extractors = []
         self.extractor_data = []
@@ -62,8 +64,9 @@ class Engine:
         np.save(path, param_dict)
         print("Parameters saved")
 
-        self.gui.release()
         self.source.release()
+        if (self.gui is not None):
+            self.gui.release()
 
         for extractor in self.extractors:
             try:
@@ -109,11 +112,12 @@ class Engine:
     def arm(self) -> None:
         (width, height), image = self.source.init()
         self.source.arm(width, height, image)
-        self.gui.arm(
-            (width, height),
-            self.pupil_processor,
-            self.cr_processors
-        )
+        if (self.gui is not None):
+            self.gui.arm(
+                (width, height),
+                self.pupil_processor,
+                self.cr_processors
+            )
         self.center = (width//2, height//2)
         self.width, self.height = width, height
 
@@ -180,6 +184,8 @@ class Engine:
             self.track(frame)
         
         self.run_extractors()
+        if (self.gui is not None):
+            self.gui.update(frame, self.extractor_data)
 
     def run(self) -> None:
         self.source.route()
@@ -189,8 +195,6 @@ class Engine:
         Runs Core engine in record mode. Timestamps all frames in data output log.
         """
         self.dataout = { "time": time.time() }
-
-        self.gui.update(frame)
 
     def track(self, frame) -> None:
         """
@@ -235,6 +239,3 @@ class Engine:
             self.dataout["pupil"] = self.pupil_processor.track(frame)
             for i in range(len(self.cr_processors)):
                 self.dataout[f"cr_{i}"] = self.cr_processors[i].track(frame)
-
-        self.gui.update(frame)
-    

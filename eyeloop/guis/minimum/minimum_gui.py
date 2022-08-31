@@ -1,5 +1,7 @@
+from enum import Enum
 import os
 from pathlib import Path
+import time
 from eyeloop.utilities.target_type import TargetType
 
 import numpy as np
@@ -54,6 +56,11 @@ tooltips = {
     },
 }
 
+class GuiState(Enum):
+    CONFIGURATION = "CONFIGURATION"
+    TRACKING = "TRACKING"
+    RECORDING = "RECORDING"
+
 class GUI:
     def __init__(self, on_angle = None, on_center = None, on_quit = None) -> None:
         self.on_angle = on_angle
@@ -67,20 +74,15 @@ class GUI:
             self.tooltips[key]["src"] = cv2.imread(f'{dir_path}/graphics/{name}.png', 0)
         self.first_tool_tip = self.tooltips["0"]["src"]
 
-        self._state = "configuration"
+        self._state = GuiState.CONFIGURATION
         self.inquiry = "none"
-        self.terminate = -1
-        self.update = self.update_configure
-        self.skip = 0
+        self.last_time = time.time()
         self.first_run = True
         self.cr_index = 0
         self.cr_processor_index = 0
         self.cr_processors = []
 
         self.out = None
-
-        self.crs_ = [lambda _: False]
-
 
     def release(self):
         cv2.destroyAllWindows()
@@ -104,6 +106,7 @@ class GUI:
         cv2.imshow(WINDOW_TOOLTIP, self.tooltips[key]["src"])
 
     def add_mouse_events(self) -> None:
+        print("ADDED MOUSE EVENTS")
         try:
             cv2.setMouseCallback(WINDOW_CONFIGURATION, self.on_mouse_move)
             cv2.setMouseCallback(WINDOW_TOOLTIP, self.on_mouse_move_tooltips)
@@ -144,18 +147,17 @@ class GUI:
                 cv2.imshow(WINDOW_TRACKING, self.bin_stock)
                 cv2.moveWindow(WINDOW_TRACKING, 100, 100)
 
-                self._state = "tracking"
+                self._state = GuiState.TRACKING
                 self.inquiry = "none"
-                self.update = self.update_track
                 return
 
             elif "n" == key:
                 print("Adjustments resumed.")
-                self._state = "configuration"
+                self._state = GuiState.CONFIGURATION
                 self.inquiry = "none"
                 return
 
-        if self._state == "configuration":
+        if self._state == GuiState.CONFIGURATION:
             current_cr_processor = self.cr_processors[self.cr_processor_index]
 
             if key == "p":
@@ -358,11 +360,23 @@ class GUI:
             logger.warn(f'Failed to calculate the binarized data for the corneal reflect processor - {src} {e}')
             self.bin_CR[0:20, 0:self.binary_width] = self.crstock_txt
     
+    def render_fps(self, frame, data):
+        key = "FpsExtractor"
+        if (not key in data):
+            return
+        fps = data[key]
+        cv2.putText(frame, f'FPS: {fps}', (10, 15), font, .7, 1, 0, cv2.LINE_4)
 
-    def skip_track(self):
-        self.update = self.update_track
+    def update(self, frame, data):
+        print(f"Track {self._state} {data}")
+        if (self._state == GuiState.RECORDING):
+            self.update_record(frame, data)
+        elif (self._state == GuiState.TRACKING):
+            self.update_track(frame, data)
+        else:
+            self.update_configure(frame, data)
 
-    def update_configure(self, frame):
+    def update_configure(self, frame, data):
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
 
         self.bin_P = self.bin_stock.copy()
@@ -377,6 +391,7 @@ class GUI:
         self.draw_corneal_reflection(frame_rgb, self.cr_processor_index)
         self.generate_corneal_reflection_binarization()
 
+        self.render_fps(frame_rgb, data)
 
         cv2.imshow(WINDOW_BINARY, np.vstack((self.bin_P, self.bin_CR)))
         cv2.imshow(WINDOW_CONFIGURATION, frame_rgb)
@@ -386,22 +401,26 @@ class GUI:
         if self.first_run:
             self.first_run = False
 
-    def update_record(self, frame_preview) -> None:
+    def update_record(self, frame_preview, data) -> None:
         cv2.imshow(WINDOW_RECORDING, frame_preview)
         if cv2.waitKey(1) == ord('q'):
             self.on_quit()
 
-    def update_track(self, frame) -> None:
+    def update_track(self, frame, data) -> None:
+        diff = time.time() - self.last_time
+        if (diff < self.frequency_track):
+            return
+        self.last_time = time.time()
+
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
 
         self.draw_pupil(frame_rgb)
         for i in range(len(self.cr_processors)):
             self.draw_corneal_reflection(frame_rgb, i)
 
+        self.render_fps(frame_rgb, data)
         cv2.imshow(WINDOW_TRACKING, frame_rgb)
 
-        threading.Timer(self.frequency_track, self.skip_track).start() #run feed every n secs (n=1)
-        self.update = lambda _: None
 
         if cv2.waitKey(1) == ord("q"):
             self.on_quit()
