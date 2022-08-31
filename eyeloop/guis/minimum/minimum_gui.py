@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from eyeloop.utilities.target_type import TargetType
 
 import numpy as np
 
@@ -54,8 +55,9 @@ tooltips = {
 }
 
 class GUI:
-    def __init__(self, on_angle = None, on_quit = None) -> None:
+    def __init__(self, on_angle = None, on_center = None, on_quit = None) -> None:
         self.on_angle = on_angle
+        self.on_center = on_center
         self.on_quit = on_quit
         self.tooltips = tooltips.copy()
         dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -84,6 +86,7 @@ class GUI:
         cv2.destroyAllWindows()
 
     def on_mouse_move(self, event, x, y, flags, params) -> None:
+        # logger.info(f'Mouse move {x} {y}')
         x = x % self.width
         self.cursor = (x, y)
 
@@ -163,31 +166,30 @@ class GUI:
 
             elif "1" == key:
                 try:
-                    self.pupil_processor.reset(self.cursor)
+                    self.pupil_processor.set_center(self.cursor)
                     self.update_tool_tip(4)
                     print("Pupil selected.\nAdjust binarization via R/F (threshold) and T/G (smoothing).")
 
                 except Exception as e:
                     self.update_tool_tip(3, True)
-                    logger.info(f"pupil selection failed; {e}")
+                    logger.info(f"Failed selecting pupil - {e}")
 
             elif "2" == key:
                 try:
-
-                    current_cr_processor.reset(self.cursor)
+                    current_cr_processor.set_center(self.cursor)
                     self.cr_processor_index = 0
                     self.update_tool_tip(2)
                     print("Corneal reflex 1 selected.\nAdjust binarization via W/S (threshold) and E/D (smoothing).")
 
                 except Exception as e:
                     self.update_tool_tip(1, True)
-                    logger.info(f"CR selection failed; {e}")
+                    logger.info(f"Failed selecting corneal reflection - {e}")
 
             elif "3" == key:
                 try:
-                    self.update_tool_tip(2)
+                    current_cr_processor.set_center(self.cursor)
                     self.cr_processor_index = 1
-                    current_cr_processor.reset(self.cursor)
+                    self.update_tool_tip(2)
 
                     print("\nCorneal reflex 2 selected.")
                     print("Adjust binarization via W/S (threshold) and E/D (smoothing).")
@@ -287,76 +289,97 @@ class GUI:
         cv2.imshow(WINDOW_TOOLTIP, self.first_tool_tip)
 
     def draw_cross(self, source: np.ndarray, point: tuple, color: tuple) -> None:
+        # print(f"Draw cross: source {source}, point: {point}, color: {color}")
         source[to_int(point[1] - 3):to_int(point[1] + 4), to_int(point[0])] = color
         source[to_int(point[1]), to_int(point[0] - 3):to_int(point[0] + 4)] = color
 
-    def draw_pupil(self, source_rgb):
-        try:
-            pupil_center, pupil_width, pupil_height, pupil_angle = self.pupil_processor.fit_model.params
+    def draw_pupil(self, frame_rgb):
+        params = self.pupil_processor.fit_model.params
+        if (params == None):
+            return
 
-            cv2.ellipse(source_rgb, tuple_int(pupil_center), tuple_int((pupil_width, pupil_height)), pupil_angle, 0, 360, red, 1)
-            self.draw_cross(source_rgb, pupil_center, red)
+        try:
+            center, width, height, angle = params
+            if (not center):
+                return False
+            cv2.ellipse(frame_rgb, tuple_int(center), tuple_int((width, height)), angle, 0, 360, red, 1)
+            self.draw_cross(frame_rgb, center, red)
             return True
         except Exception as e:
-            logger.info(f"pupil not found: {e}")
+            logger.info(f"pupil not found: {e} - {self.pupil_processor.fit_model.params}")
             return False
 
-    def draw_corneal_reflection(self, source_rgb, index):
+    def draw_corneal_reflection(self, frame_rgb, index):
         if (index >= len(self.cr_processors)):
-            logger.warn(f'Error processing corneal reflection #{index} - no processor')
-            return 
+            logger.warn(f'Error drawing corneal reflection #{index} - no processor')
+            return
+
+        params = self.cr_processors[index].fit_model.params
+        if (params == None):
+            return
 
         try:
-            cr_center, cr_width, cr_height, cr_angle = params = self.cr_processors[index].fit_model.params
-            cv2.ellipse(source_rgb, tuple_int(cr_center), tuple_int((cr_width, cr_height)), cr_angle, 0, 360, green, 1)
-            self.draw_cross(source_rgb, self.cr_processors[index].center, green)
+            center, width, height, angle = params
+            if (not center):
+                return False 
+            cv2.ellipse(frame_rgb, tuple_int(center), tuple_int((width, height)), angle, 0, 360, green, 1)
+            self.draw_cross(frame_rgb, center, green)
             return True
         except Exception as e:
-            logger.warn(f'Error processing corneal reflection #{index} - {e}')
+            logger.warn(f'Error processing corneal reflection #{index} - {e} {params}')
             return False
+    
+    def generate_pupil_binarization(self):
+        src = self.pupil_processor.src
+        if (type(src) is not np.ndarray):
+            return
+
+        try:
+            offset_y = int((self.binary_height - src.shape[0]) / 2)
+            offset_x = int((self.binary_width - src.shape[1]) / 2)
+            self.bin_P[offset_y:min(offset_y + src.shape[0], self.binary_height),
+            offset_x:min(offset_x + src.shape[1], self.binary_width)] = src
+        except Exception as e:
+            logger.warn(f'Failed to calculate the binarized data for the pupil processor - {e}')
+            
+    def generate_corneal_reflection_binarization(self):
+        self.bin_CR = self.bin_stock.copy()
+        src = self.cr_processors[self.cr_processor_index].src
+        if (type(src) is not np.ndarray):
+            return
+
+        try:
+            offset_y = int((self.binary_height - src.shape[0]) / 2)
+            offset_x = int((self.binary_width - src.shape[1]) / 2)
+            self.bin_CR[offset_y:min(offset_y + src.shape[0], self.binary_height),
+            offset_x:min(offset_x + src.shape[1], self.binary_width)] = src
+            self.bin_CR[0:20, 0:self.binary_width] = self.crstock_txt_selected
+        except Exception as e:
+            logger.warn(f'Failed to calculate the binarized data for the corneal reflect processor - {src} {e}')
+            self.bin_CR[0:20, 0:self.binary_width] = self.crstock_txt
+    
 
     def skip_track(self):
         self.update = self.update_track
 
-    def update_configure(self, img):
-        source_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    def update_configure(self, frame):
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
 
         self.bin_P = self.bin_stock.copy()
 
-        if self.draw_pupil(source_rgb):
+        if self.draw_pupil(frame_rgb):
             self.bin_P[0:20, 0:self.binary_width] = self.bin_stock_txt_selected
         else:
             self.bin_P[0:20, 0:self.binary_width] = self.bin_stock_txt
+        self.generate_pupil_binarization()
+        
 
-        try:
-            pupil_area = self.pupil_processor.source
-
-            offset_y = int((self.binary_height - pupil_area.shape[0]) / 2)
-            offset_x = int((self.binary_width - pupil_area.shape[1]) / 2)
-            self.bin_P[offset_y:min(offset_y + pupil_area.shape[0], self.binary_height),
-            offset_x:min(offset_x + pupil_area.shape[1], self.binary_width)] = pupil_area
-        except:
-            logger.warn(f'Failed to calculate binarization pupil')
-            pass
-
-        self.draw_corneal_reflection(source_rgb, self.cr_processor_index)
-        self.bin_CR = self.bin_stock.copy()
-
-        try:
-            cr_area = self.cr_processors[self.cr_processor_index].source
-            offset_y = int((self.binary_height - cr_area.shape[0]) / 2)
-            offset_x = int((self.binary_width - cr_area.shape[1]) / 2)
-            self.bin_CR[offset_y:min(offset_y + cr_area.shape[0], self.binary_height),
-            offset_x:min(offset_x + cr_area.shape[1], self.binary_width)] = cr_area
-            self.bin_CR[0:20, 0:self.binary_width] = self.crstock_txt_selected
-        except:
-            logger.warn(f'Failed to calculate binarization CR')
-            self.bin_CR[0:20, 0:self.binary_width] = self.crstock_txt
-            pass
+        self.draw_corneal_reflection(frame_rgb, self.cr_processor_index)
+        self.generate_corneal_reflection_binarization()
 
 
         cv2.imshow(WINDOW_BINARY, np.vstack((self.bin_P, self.bin_CR)))
-        cv2.imshow(WINDOW_CONFIGURATION, source_rgb)
+        cv2.imshow(WINDOW_CONFIGURATION, frame_rgb)
 
         key = cv2.waitKey(CV_IMAGE_PERIOD)
         self.key_listener(key)
@@ -368,14 +391,14 @@ class GUI:
         if cv2.waitKey(1) == ord('q'):
             self.on_quit()
 
-    def update_track(self, img) -> None:
-        source_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    def update_track(self, frame) -> None:
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
 
-        self.draw_pupil(source_rgb)
+        self.draw_pupil(frame_rgb)
         for i in range(len(self.cr_processors)):
-            self.draw_corneal_reflection(source_rgb, i)
+            self.draw_corneal_reflection(frame_rgb, i)
 
-        cv2.imshow(WINDOW_TRACKING, source_rgb)
+        cv2.imshow(WINDOW_TRACKING, frame_rgb)
 
         threading.Timer(self.frequency_track, self.skip_track).start() #run feed every n secs (n=1)
         self.update = lambda _: None

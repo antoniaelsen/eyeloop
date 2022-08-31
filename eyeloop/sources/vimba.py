@@ -7,6 +7,7 @@ import eyeloop.config as config
 from eyeloop.sources.source import Source
 
 
+# TODO(aelsen): needs refactor
 # For pymba documentation, see:
 # https://github.com/morefigs/pymba
 

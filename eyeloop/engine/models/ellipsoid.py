@@ -1,7 +1,7 @@
 import numpy as np
-np.seterr('raise')
 
 from eyeloop.utilities.general_operations import tuple_int
+from eyeloop.engine.models.model import Model
 
 """Demonstration of least-squares fitting of ellipses
     __author__ = "Ben Hammel, Nick Sullivan-Molina"
@@ -24,12 +24,11 @@ from eyeloop.utilities.general_operations import tuple_int
 """
 
 
-class Ellipse:
-    def __init__(self, processor):
-        self.shape_processor = processor
-        self.params = None
+class Ellipse(Model):
+    def __init__(self):
+        super().__init__()
 
-    def fit(self, r):
+    def fit(self, r: float):
         """Least Squares fitting algor6ithm
         Theory taken from (*)
         Solving equation Sa=lCa. with a = |a b c d f g> and a1 = |a b c>
@@ -116,6 +115,7 @@ class Ellipse:
         z_ = (b_sq - ac)
         x0 = (cd - b * f) / z_#(b ** 2. - a * c)
         y0 = (af - bd) / z_#(b ** 2. - a * c)
+        center = (x0, y0)
 
         # Find the semi-axes lengths [eqn. 21 and 22] from (**)
         ac_subtr = a - c
@@ -127,7 +127,7 @@ class Ellipse:
         height = np.sqrt(numerator / denominator2)
 
         phi = .5 * np.arctan((2. * b) / ac_subtr)
-        self.params = ((x0, y0), width, height, np.rad2deg(phi) % 360)
+        angle = np.rad2deg(phi) % 360
+        self.params = (center, width, height, angle)
 
-        #self.center, self.width, self.height, self.angle = self.params
-        return self.params[0]
+        return center

@@ -1,122 +1,116 @@
+from abc import abstractmethod
 import cv2
-from enum import Enum
+import logging
+
 import eyeloop.config as config
 from eyeloop.constants.processor_constants import *
 from eyeloop.engine.models.circular import Circle
 from eyeloop.engine.models.ellipsoid import Ellipse
 from eyeloop.utilities.general_operations import to_int, tuple_int
-import logging
+from eyeloop.utilities.target_type import TargetType
 
 logger = logging.getLogger(__name__)
 
-class ProcessorType(Enum):
-    PUPIL = 1
-    CORNEAL_REFLECTION = 2
 
-class Center():
-    def fit(self, r):
-        # logger.info(f'Center - fit {r}')
-        self.params = tuple(np.mean(r, axis = 0))
-        return self.params
+# TODO(aelsen): min and max radii pulled out into constructor, should be in config
 
 class Shape():
-    def __init__(self, type = ProcessorType.PUPIL, n = 0):
+    def __init__(self, min_radius = 1, max_radius = 100):
         self.active = False
-        self.center = -1
-        self.walkout_offset = 0
+        self.type = None
+
+        self.max_radius = max_radius
+        self.min_radius = min_radius
         self.binarythreshold = -1
         self.blur = [3, 3]
-        self.type = type
-        self.fit_ = lambda: None
-
         self.model = config.arguments.model
-        self.type_entry = None
-        self.track = lambda x:None
+        self.threshold = len(CROP_STOCK) * self.min_radius * 1.05
 
-        if type == ProcessorType.PUPIL:
-            self.artefact = lambda _:None
-            self.type_entry = "pupil"
-            self.thresh = self.pupil_thresh
+        self.src = None
+        self.src_dimms = (0, 0)
+        self.center = -1
+        self.fit_model = None
 
-            if self.model == "circular":
-                self.fit_model = Circle(self)
-            else:
-                self.fit_model = Ellipse(self)
 
-            self.min_radius = 2
-            self.max_radius = 100 #change according to video size or argument
-            self.cond = self.cond_
-            #self.clip = lambda x:None
-            self.clip = self.clip_
-            self.center_adj = self.center_adj_
+    # TODO(aelsen): pup_source DNE
+    # def artefact(self, params):
+    #     cv2.circle(config.engine.pup_source, tuple_int(params[0]), to_int(params[1] * self.expand), black, -1)
 
-            self.walkout = self.pupil_walkout
+    # TODO(aelsen): not used
+    # def clip(self, crop_list):
+    #     np.clip(crop_list, self.min_radius, self.max_radius, out = crop_list)
 
-            self.track = self.track_
+    @abstractmethod
+    def apply_threshold(self, src):
+        raise NotImplementedError
 
-        else:
-            self.walkout = self.cr_walkout
-            self.type_entry = f"cr_{n}"
-            self.center_adj = lambda:None
-            self.cond = lambda r,_:r
-            self.clip = self.clip_
-            self.expand = 1.2
-            self.artefact = lambda _:None
-            #self.artefact = self.artefact_
-            # self.fit_model = Center() #Circle(self)
-            self.fit_model = Circle(self)
+    def cond(self, r):
+        return r
 
-            self.min_radius = 1
-            self.max_radius = 20 #change according to video size or argument
+    def distance(self, a, b):
+        return np.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
 
-            self.thresh = self.cr_thresh
+    def fit(self, src, src_raw):
+        try:
+            r = self.walkout(src)
+            # logger.info(f"Fitting processor {self.type} - r {r}")
+            self.center = self.fit_model.fit(r)
+            # logger.info(f"Fitting processor {self.type} - center {self.center}")
+            # params = self.fit_model.params
+            # self.artefact(params)
 
-        self.threshold = len(crop_stock) * self.min_radius *1.05
+            return self.fit_model.params
 
-    def pupil_thresh(self):
-        # Pupil
+        except IndexError as e:
+            logger.warn(f"Failed to fit with processor {self.type} - fit index error - {e}")
+            self.on_fit_failure(src, src_raw)
 
-        self.source[:] = cv2.threshold(cv2.GaussianBlur(cv2.erode(self.source, kernel, iterations = 1), self.blur, 0), self.binarythreshold, 255, cv2.THRESH_BINARY_INV)[1]
-        #self.source[:] = cv2.GaussianBlur(self.source, self.blur, 0)
+        except Exception as e:
+            logger.warn(f"Failed to fit with processor {self.type} - Failed to fit shape model: {e}")
+            self.on_fit_failure(src, src_raw)
 
-    def cr_thresh(self):
-        # CR
+    @abstractmethod
+    def on_fit_failure(self, src, src_raw):
+        pass
 
-        _, self.source[:] = cv2.threshold(cv2.GaussianBlur(self.source, self.blur, 0), self.binarythreshold, 255, cv2.THRESH_BINARY)
-        #self.source[:] =
-
-    def reset(self, center):
-        self.active = True
-        self.margin = 0
-        self.walkout_offset = 0
+    def set_center(self, center):
         self.center = center
-        self.fit_ = self.fit
-        self.track = self.track_
-
-        self.standard_corners = [(0, 0), (config.engine.width, config.engine.height)]
-
+        self.standard_corners = [(0, 0), self.src_dimms]
         self.corners = self.standard_corners.copy()
-
+        self.active = True
         #self.tracker = cv2.TrackerMedianFlow_create()
+    
+    def set_dimensions(self, dimms):
+        self.src_dimms = dimms
+    
+    def track(self, frame):
+        if (not self.active):
+            return
 
-    def track_(self, source):
-        self.raw = source
-        self.source = source.copy()
+        src_raw = frame.copy()
+        src = frame.copy()
 
-        #self.img = img
+        # Performs a simple binarization and applies a smoothing gaussian kernel.
+        src = self.apply_threshold(src)
 
+        self.src = src
 
-        # Performs a simple binzrization and applies a smoothing gaussian kernel.
-
-        self.thresh() #either pupil or cr
-        self.fit_() #gets fit model
+        return self.fit(src, src_raw)
 
 
-    def center_adj_(self):
+class Pupil(Shape):
+    def __init__(self, min_radius = 2, max_radius = 100):
+        super().__init__(min_radius, max_radius)
+        self.type = TargetType.PUPIL
 
+        if self.model == "circular":
+            self.fit_model = Circle()
+        else:
+            self.fit_model = Ellipse()
 
-        #adjust settings:
-        circles = cv2.HoughCircles(self.raw, cv2.HOUGH_GRADIENT, 1, 10, param1=200, param2=100, minRadius=self.min_radius, maxRadius=self.max_radius)
+    def center_adjust(self, src_raw):
+        # adjust settings:
+        circles = cv2.HoughCircles(src_raw, cv2.HOUGH_GRADIENT, 1, 10, param1=200, param2=100, minRadius=self.min_radius, maxRadius=self.max_radius)
 
         if circles is None:
             return
@@ -125,12 +119,10 @@ class Shape():
             current = -1
 
             for circle in circles[0, :]:
-                #print(circle[:2])
+                score = self.distance(circle[:2], self.center) + np.mean(src_raw[int(circle[1])-self.min_radius:int(circle[1])+self.min_radius, int(circle[0]-self.min_radius):int(circle[0]+self.min_radius)])
 
-                score = self.distance(circle[:2], self.center) + np.mean(self.raw[int(circle[1])-self.min_radius:int(circle[1])+self.min_radius, int(circle[0]-self.min_radius):int(circle[0]+self.min_radius)])
-
-                self.raw[int(circle[1]), int(circle[0])] = 100
-                cv2.imshow("kk", self.raw)
+                src_raw[int(circle[1]), int(circle[0])] = 100
+                cv2.imshow("kk", src_raw)
                 cv2.waitKey(0)
                 if smallest == -1:
                     smallest = score
@@ -139,79 +131,42 @@ class Shape():
                     smallest = score
                     current = circle[:2]
                 #self.center = circles[0,0][:1]
-            #print(tuple(current), self.center)
-
-            #print(smallest, current, self.center)
             self.center = tuple(current)
 
-
-
-    def distance(self, a, b):
-        return np.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
-
-    def artefact_(self, params):
-        cv2.circle(config.engine.pup_source, tuple_int(params[0]), to_int(params[1] * self.expand), black, -1)
-
-    def fit(self):
-        try:
-            r = self.walkout()
-            self.center = self.fit_model.fit(r)
-            # print(f'Fit center: {self.center}')
-            params = self.fit_model.params
-            # print(f'Fit params: {params}')
-            #self.artefact(params)
-
-            config.engine.dataout[self.type_entry] = self.fit_model.params#params
-
-        except IndexError as e:
-            # logger.info(f"fit index error - {e}")
-            self.center_adj()
-
-        except Exception as e:
-            logger.info(f"fit-func error: {e}")
-            self.center_adj()
-
-
-    def cond_(self, r, crop_list):
-
-
-        #t=time.time()
-        #print(np.mean([rx,ry],axis=1, dtype=np.float64).shape)
-    #    dists =  np.linalg.norm(np.mean([rx,ry],axis=1, dtype=np.float64)[:,np.newaxis] - np.array([rx, ry], dtype = np.float64), axis = 0)
+    def cond(self, r):
+        # dists =  np.linalg.norm(np.mean([rx,ry],axis=1, dtype=np.float64)[:,np.newaxis] - np.array([rx, ry], dtype = np.float64), axis = 0)
         dists =  np.linalg.norm(np.mean(r,  axis = 0,dtype=np.float64) - r, axis = 1)
 
-        #print(time.time() - t)
-        #
-        mean_ = np.mean(dists)
-        std_ = np.std(dists)
-        #t=time.time()
-        lower, upper = mean_ - std_, mean_ + std_ * .8
+        mean = np.mean(dists)
+        std = np.std(dists)
+        lower, upper = mean - std, mean + std * .8
         cond_ = np.logical_and(np.greater_equal(dists, lower), np.less(dists, upper))
-        #print(time.time() - t)
-    #    print(cond_, dists)
         return r[cond_]
 
-    def clip_(self, crop_list):
-        np.clip(crop_list, self.min_radius, self.max_radius, out = crop_list)
+    def apply_threshold(self, src):
+        src = cv2.threshold(cv2.GaussianBlur(cv2.erode(src, kernel, iterations = 1), self.blur, 0), self.binarythreshold, 255, cv2.THRESH_BINARY_INV)[1]
+        return src
 
-    def pupil_walkout(self):
-        #diag_matrix = main_diagonal[:canvas_.shape[0], :canvas_.shape[1]]
+    def on_fit_failure(self, src, src_raw):
+        self.center_adjust(src_raw)
+
+    def walkout(self, src):
+        # diag_matrix = main_diagonal[:canvas_.shape[0], :canvas_.shape[1]]
 
         try:
-
             center = np.round(self.center).astype(int)
         except:
-
+            logger.warn(f"Failed to perform walkout - failed to round center {self.center}")
             return
 
 
-        canvas = np.array(self.source, dtype=int)#.copy()
+        canvas = np.array(src, dtype=int)#.copy()
         canvas[-1,:] = canvas[:,-1] = canvas[0,:] = canvas[:,0] = 0
 
 
         r = rr_2d.copy()
 
-        crop_list = crop_stock.copy()
+        crop_list = CROP_STOCK.copy()
 
 
         canvas_ = canvas[center[1]:, center[0]:]
@@ -282,8 +237,6 @@ class Shape():
             if np.sum(crop_list) < self.threshold:
                 raise IndexError("Lost track, do reset")
 
-        #simple:
-
         r[:8,:] = center
         r[ry_add, 1] += crop_list[ry_add]
         r[rx_add, 0] += crop_list[rx_add]
@@ -296,7 +249,7 @@ class Shape():
 
             #return
         # try:
-        #    canvas_rgb = cv2.cvtColor(self.source, cv2.COLOR_GRAY2RGB)
+        #    canvas_rgb = cv2.cvtColor(src, cv2.COLOR_GRAY2RGB)
         #    cy, cx = np.mean(ry, dtype=int), np.mean(rx, dtype=int)
         #    canvas_rgb[cy,cx] = [0,0,255]
         #    canvas_rgb[ry.astype("int"), rx.astype("int")] = [0,0,255]
@@ -306,28 +259,43 @@ class Shape():
         #    cv2.imshow("JJJ", canvas_rgb)
         #    cv2.waitKey(5)
         # except Exception as e:
-        #    print(e)
+        #    logger.info(e)
 
-        return self.cond(r, crop_list)#rx[cond_], ry[cond_]#rx, ry
+        # return self.cond(r, crop_list)#rx[cond_], ry[cond_]#rx, ry
+        return self.cond(r)
 
-    def cr_walkout(self):
-        #diag_matrix = main_diagonal[:canvas_.shape[0], :canvas_.shape[1]]
+
+
+class CornealReflection(Shape):
+    def __init__(self, n = 0, min_radius = 1, max_radius = 20):
+        super().__init__(min_radius, max_radius)
+        self.type = TargetType.CORNEAL_REFLECTION
+        self.fit_model = Circle()
+        # self.fit_model = Center() # old
+        # self.expand = 1.2 # old
+
+    def apply_threshold(self, src):
+        _, src = cv2.threshold(cv2.GaussianBlur(src, self.blur, 0), self.binarythreshold, 255, cv2.THRESH_BINARY)
+        return src
+
+    def walkout(self, src):
+        # diag_matrix = main_diagonal[:canvas_.shape[0], :canvas_.shape[1]]
 
         try:
             center = np.round(self.center).astype(int)
         except:
+            logger.warn(f"Failed to perform walkout - failed to round center {self.center}")
             return
 
-        #canvas = np.array(self.source, dtype=int)#.copy()
+        #canvas = np.array(src, dtype=int)#.copy()
 
         r = rr_2d_cr.copy()
 
-
-        crop_list = crop_stock_cr.copy()
+        crop_list = CROP_STOCK_CR.copy()
         #rx = np.zeros(4)
         #ry = np.zeros(4)
 
-        canvas_ = self.source[center[1]:, center[0]:]
+        canvas_ = src[center[1]:, center[0]:]
 
         crop_list[0] = np.argmax(canvas_[:, 0] == 0) #- 1
         #crop_ = np.argmax(canvas_[:, 0] == 0) #- 1
@@ -341,7 +309,7 @@ class Shape():
     #    ry[2], rx[2] = center[1], crop_ + center[0]
 
 
-        canvas = np.flip(self.source) # flip once
+        canvas = np.flip(src) # flip once
 
         crop_list[3] = -np.argmax(canvas[-center[1], -center[0]:] == 0)
         #crop_ = np.argmax(canvas[-center[1], -center[0]:] == 0)# - 1
@@ -353,9 +321,9 @@ class Shape():
     #    crop_ = np.argmax(canvas[-center[1]:, -center[0]] == 0)
 
         #ry[1], rx[1] = -crop_ + center[1], center[0]
-        #print()
+        #logger.info()
 
-        #print(r, crop_list)
+        #logger.info(r, crop_list)
         r[:,:] = center
 
         r[:2, 1] += crop_list[:2]
@@ -363,11 +331,11 @@ class Shape():
 
 
 
-        #print(r, rx, ry)
+        #logger.info(r, rx, ry)
 
         # try:
         #
-        #    canvas_rgb = cv2.cvtColor(self.source, cv2.COLOR_GRAY2RGB)
+        #    canvas_rgb = cv2.cvtColor(src, cv2.COLOR_GRAY2RGB)
         #
         #   # canvas_rgb[cy,cx] = [0,0,255]
         #    #canvas_rgb[ry.astype("int"), rx.astype("int")] = [0,255,0]
@@ -378,7 +346,7 @@ class Shape():
         #    cv2.imshow("JJJ", canvas_rgb)
         #    cv2.waitKey(5)
         # except Exception as e:
-        #    print(e)
+        #    logger.info(e)
 
 
         return r#rx[cond_], ry[cond_]#rx, ry

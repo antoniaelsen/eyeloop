@@ -4,22 +4,26 @@
 # hyper-fit authors: Kenichi Kanatani & Prasanna Rangarajan
 
 import numpy as np
+import logging
 np.seterr('raise')
 
+from eyeloop.engine.models.model import Model
 from eyeloop.utilities.general_operations import tuple_int
+logger = logging.getLogger(__name__)
 
 
-class Circle:
-    def __init__(self, processor) -> None:
-        self.shape_processor = processor
-        self.fit = self.hyper_fit
-        self.params = None
+class Circle(Model):
+    def __init__(self):
+        super().__init__()
 
-    def hyper_fit(self, r) -> tuple:
+    def fit(self, r) -> tuple:
+        return self.hyper_fit(r)
+
+    def hyper_fit(self, r: float) -> tuple:
         """
         Fits coords to circle using hyperfit algorithm.
         Inputs:
-            - coords, list or numpy array with len>2 of the form:
+            - coords, list or numpy array with len > 2 of the form:
             [
         [x_coord, y_coord],
         ...,
@@ -54,19 +58,17 @@ class Circle:
         Mz = Mxx + Myy
 
         # finding the root of the characteristic polynomial
-
-        det = (Mxx * Myy - Mxy**2)*2
-        #print(det)
+        det = (Mxx * Myy - Mxy**2) * 2
         try:
-            Xcenter = (Mxz * Myy - Myz * Mxy)/ det
-            Ycenter = (Myz * Mxx - Mxz * Mxy)/ det
+            Xcenter = (Mxz * Myy - Myz * Mxy) / det
+            Ycenter = (Myz * Mxx - Mxz * Mxy) / det
         except:
             return False
 
         x = Xcenter + mean_X
         y = Ycenter + mean_Y
+        center = (x, y)
         r = np.sqrt(Xcenter ** 2 + Ycenter ** 2 + Mz)
-        self.params = ((x, y), r, r, 0)
-        #self.center, self.width, self.height, self.angle = self.params
+        self.params = (center, r, r, 0)
 
-        return self.params[0]
+        return center

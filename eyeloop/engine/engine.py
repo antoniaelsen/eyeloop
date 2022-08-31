@@ -6,9 +6,10 @@ import glob, os
 
 import eyeloop.config as config
 from eyeloop.constants.engine_constants import *
-from eyeloop.engine.processor import Shape
+from eyeloop.engine.processor import CornealReflection, Pupil
 from eyeloop.sources.source import Source
 from eyeloop.utilities.general_operations import to_int, tuple_int
+from eyeloop.utilities.target_type import TargetType
 
 logger = logging.getLogger(__name__)
 PARAMS_DIR = f"{dirname(dirname(abspath(__file__)))}/engine/params"
@@ -23,16 +24,15 @@ class Engine:
         self.gui = gui(on_angle=self.update_angle, on_quit=self.release)
         self.source = source(on_frame=self.on_frame)
 
-        self.model = config.arguments.model  # Used for assigning appropriate circular model.
-
         self.extractors = []
         self.extractor_data = []
         self.state = State.RECORD if config.arguments.tracking == 0 else State.TRACK
+        self.blink_active = False
 
         self.frame_i = 0
         self.angle = 0
-        self.pupil_processor = Shape()
-        self.cr_processors = [Shape(type = 2, n = 1) for x in range(2)]
+        self.pupil_processor = Pupil()
+        self.cr_processors = [CornealReflection(n = x) for x in range(2)]
 
     def activate(self) -> None:
         """
@@ -148,8 +148,10 @@ class Engine:
             
         filtered_image = image[np.logical_and((image < 220), (image > 30))]
         self.pupil_processor.binarythreshold = np.min(filtered_image) * 1 + np.median(filtered_image) * .1#+ 50
+        self.pupil_processor.set_dimensions((width, height))
         for i in range(len(self.cr_processors)):
             self.cr_processors[i].binarythreshold = float(np.min(filtered_image)) * .7 + 150
+            self.cr_processors[i].set_dimensions((width, height))
 
         if (filtered_image.size > 0):
             self.pupil_processor.binarythreshold = np.min(filtered_image) * 1 + np.median(filtered_image) * .1 #+ 50
@@ -190,7 +192,6 @@ class Engine:
 
         self.gui.update(frame)
 
-
     def track(self, frame) -> None:
         """
         Executes the tracking algorithm on the pupil and corneal reflections.
@@ -223,11 +224,17 @@ class Engine:
         if np.abs(mean_img - mean_blink) > 10:
             self.dataout["blink"] = 1
             self.pupil_processor.fit_model.params = None
-            logger.info("Blink detected.")
+            if (not self.blink_active):
+                self.blink_active = True
+                logger.info("Blink started.")
         else:
-            self.pupil_processor.track(frame)
+            if (self.blink_active):
+                self.blink_active = False
+                logger.info("Blink over.")
+
+            self.dataout["pupil"] = self.pupil_processor.track(frame)
             for i in range(len(self.cr_processors)):
-                self.cr_processors[i].track(frame)
+                self.dataout[f"cr_{i}"] = self.cr_processors[i].track(frame)
 
         self.gui.update(frame)
     

@@ -48,9 +48,9 @@ rr_2d_cr = np.zeros((4, 2), dtype=np.float64)
 rx_multiply = np.ones((32), dtype=np.float64)
 ry_multiply = rx_multiply.copy()
 
-crop_stock = np.zeros((32), dtype=int)
-crop_stock_cr = np.zeros((4), dtype=int)
-center_shape = (2, 31)
+CROP_STOCK = np.zeros((32), dtype=int)
+CROP_STOCK_CR = np.zeros((4), dtype=int)
+# center_shape = (2, 31)
 
 
 onehalf_ry_add = [8,10,12,14]
