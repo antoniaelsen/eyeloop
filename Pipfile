@@ -13,6 +13,7 @@ eyeloop = {path = "."}
 opencv-python = "*"
 opencv-python-headless = "*"
 pillow = "*"
+numpy = "==1.23.2"
 
 [dev-packages]
 
