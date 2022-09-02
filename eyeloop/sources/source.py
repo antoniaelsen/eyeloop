@@ -7,7 +7,6 @@ from eyeloop.utilities.general_operations import tuple_int
 
 class Source:
     def __init__(self, on_frame = None):
-        print(f'CREATING SOURCE')
         self.on_frame = on_frame
         self.scale = config.arguments.scale
 

@@ -15,6 +15,7 @@ import threading
 import logging
 logger = logging.getLogger(__name__)
 
+
 WINDOW_BINARY = "Binarization"
 WINDOW_CONFIGURATION = "Raw Video"
 WINDOW_TOOLTIP = "Instructions"
@@ -121,9 +122,9 @@ class GUI:
         cv2.namedWindow(WINDOW_BINARY)
         cv2.namedWindow(WINDOW_CONFIGURATION)
         cv2.namedWindow(WINDOW_TOOLTIP)
-        cv2.moveWindow(WINDOW_BINARY, math.ceil(width / 2), 0)
+        cv2.moveWindow(WINDOW_BINARY, width, 0)
         cv2.moveWindow(WINDOW_CONFIGURATION, 0, 0)
-        cv2.moveWindow(WINDOW_TOOLTIP, 0, math.ceil(height / 2))
+        cv2.moveWindow(WINDOW_TOOLTIP, 0, height + 20)
  
         self.add_mouse_events()
 
@@ -365,7 +366,7 @@ class GUI:
         if (not key in data):
             return
         fps = data[key]
-        print(f"render fps {fps}")
+        # print(f"render fps {fps}")
         cv2.putText(frame, f'FPS: {fps}', (10, 15), font, .7, 1, 0, cv2.LINE_4)
 
     def update(self, frame, data):
@@ -393,7 +394,7 @@ class GUI:
 
         self.render_fps(frame, data)
 
-        # cv2.imshow(WINDOW_BINARY, np.vstack((self.bin_P, self.bin_CR)))
+        cv2.imshow(WINDOW_BINARY, np.vstack((self.bin_P, self.bin_CR)))
         cv2.imshow(WINDOW_CONFIGURATION, frame_rgb)
 
         key = cv2.waitKey(CV_IMAGE_PERIOD)

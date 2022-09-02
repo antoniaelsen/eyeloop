@@ -1,8 +1,5 @@
 from abc import abstractmethod
-import time
-
-import cv2
-import numpy as np
+from typing import Any
 
 
 class Extractor():
@@ -14,10 +11,10 @@ class Extractor():
         raise NotImplementedError
 
     @abstractmethod
-    def fetch(self, engine):
+    def fetch(self, engine) -> Any:
         raise NotImplementedError
 
     @abstractmethod
-    def release(self):
+    def release(self) -> None:
         raise NotImplementedError
 

@@ -19,20 +19,19 @@ def clear() -> None:
         _ = system('clear')
 
 
-def logo(label="") -> None:
+def logo() -> None:
     logo = r"""
-                                >> {}
 
      ___      ___       __   __   __
     |__  \ / |__  |    /  \ /  \ |__)
     |___  |  |___ |___ \__/ \__/ |
 
-                                  v{}
-                                           """.format(label, config.version)
+    v{}
+                                           """.format(config.version)
     return logo
 
 
-def welcome(label="") -> None:
+def welcome() -> None:
     clear()
     msg = r"""
     {}
@@ -42,5 +41,5 @@ def welcome(label="") -> None:
     Translational Neuroscience (DANDRITE)
 
     {}
-    {}{}""".format(logo(label), git, journal, linebreak)
+    {}{}""".format(logo(), git, journal, linebreak)
     print(msg)

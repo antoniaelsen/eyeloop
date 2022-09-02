@@ -52,9 +52,9 @@ One of EyeLoop's most appealing features is its modularity: Experiments are buil
 > How does [the Source](https://github.com/simonarvin/eyeloop/blob/master/eyeloop/importers/README.md) work?\
 > How does [the Extractor](https://github.com/simonarvin/eyeloop/blob/master/eyeloop/extractors/README.md) work?
 
-## Getting started
+# Getting started
 
-### Installation
+## Installation
 
 Requirements:
 
@@ -66,26 +66,30 @@ Install EyeLoop by cloning the repository:
 git clone https://github.com/simonarvin/eyeloop.git
 ```
 
-> Dependencies: `python -m pip install -r requirements.txt`
+### Install dependencies
 
-> Using pip:
-> `pip install .`
+You may want to use a virtual environment when
+installing `eyeloop`'s dependencies, to avoid conflicts with your globally installed dependencies.
 
-You may want to use a Conda or Python virtual environment when
-installing `eyeloop`, to avoid mixing up with your system dependencies.
+Using pip and a virtual environment:
 
-> Using pip and a virtual environment:
+```
+python -m venv venv
+source venv/bin/activate
+(venv) pip install .
+```
 
-> `python -m venv venv`
+or, using pipenv
 
-> `source venv/bin/activate`
+```
+pipenv install
+```
 
-> `(venv) pip install .`
+### Install the module
 
-Alternatively:
-
-> - numpy: `python pip install numpy`
-> - opencv: `python pip install opencv-python`
+```
+pip install .
+```
 
 To download full examples with footage, check out EyeLoop's playground repository:
 
@@ -97,16 +101,22 @@ git clone https://github.com/simonarvin/eyeloop_playground.git
 
 ### Initiation
 
-EyeLoop is initiated through the command-line utility `eyeloop`.
+Run with:
 
 ```
-eyeloop
+python eyeloop/run_eyeloop.py <...args>
 ```
 
-To access the video sequence, EyeLoop must be connected to an appropriate _importer class_ module. Usually, the default opencv source class (_cv_) is sufficient. For some machine vision cameras, however, a vimba-based source (_vimba_) is neccessary.
+E.g. running the eyeloop_playground human recording with its blink calibration:
 
 ```
-eyeloop --source cv/vimba
+python eyeloop/run_eyeloop.py -b=<...>/eyeloop_playground/examples/human/human-blinkcalibration.npy --video=<...>/eyeloop_playground/examples/human/human.mp4
+```
+
+To access the video sequence, EyeLoop must be connected to an appropriate _importer class_ module. Usually, the default opencv source class (_cv_ via `cv_stream`) is sufficient. For some machine vision cameras, however, a vimba-based source (_vimba_) may be neccessary.
+
+```
+python eyeloop/run_eyeloop.py --source cv/vimba
 ```
 
 > [Click here](https://github.com/simonarvin/eyeloop/blob/master/eyeloop/importers/README.md) for more information on _importers_.
@@ -114,7 +124,7 @@ eyeloop --source cv/vimba
 To perform offline eye-tracking, we pass the video argument `--video` with the path of the video sequence:
 
 ```
-eyeloop --video [file]/[folder]
+python eyeloop/run_eyeloop.py --video [file]/[folder]
 ```
 
 <p align="right">
@@ -124,7 +134,7 @@ eyeloop --video [file]/[folder]
 EyeLoop can be used on a multitude of eye types, including rodents, human and non-human primates. Specifically, users can suit their eye-tracking session to any species using the `--model` argument.
 
 ```
-eyeloop --model ellipsoid/circular
+python eyeloop/run_eyeloop.py --model ellipsoid/circular
 ```
 
 > In general, the ellipsoid pupil model is best suited for rodents, whereas the circular model is best suited for primates.
@@ -134,7 +144,7 @@ To learn how to optimize EyeLoop for your video material, see [_EyeLoop Playgrou
 To see all command-line arguments, pass:
 
 ```
-eyeloop --help
+python eyeloop/run_eyeloop.py --help
 ```
 
 ## Designing your first experiment
@@ -146,7 +156,7 @@ eyeloop --help
 In EyeLoop, experiments are built by stacking modules. By default, EyeLoop imports two base _extractors_, namely a FPS-counter and a data acquisition tool. To add custom extractors, e.g., for experimental purposes, use the argument tag `--extractors`:
 
 ```
-eyeloop --extractors [file_path]/p (where p = file prompt)
+python eyeloop/run_eyeloop.py --extractors [file_path]/p (where p = file prompt)
 ```
 
 Inside the _extractor_ file, or a composite python file containing several _extractors_, define the list of _extractors_ to be added:
@@ -166,6 +176,7 @@ class Extractor:
 ```
 
 `fetch()` gains access to all eye-tracking data in real-time via the _core_ pointer.
+The `fetch()` method can return a value; the value will be stored in a dictionary of all extractor values for that time-step.
 
 > [Click here](https://github.com/simonarvin/eyeloop/blob/master/eyeloop/extractors/README.md) for more information on _extractors_.
 

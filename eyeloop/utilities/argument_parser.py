@@ -46,7 +46,7 @@ class Arguments:
         parser.add_argument("-r", "--rotation", default=0, type=int,
                             help="Enable online rotation (yes/no, 1/0; default = 0)")
         parser.add_argument("-s", "--scale", default=1, type=float, help="Scale the stream (default: 1; 0-1)")
-        parser.add_argument("-v", "--video", default="0", type=str,
+        parser.add_argument("-v", "--video", default="", type=str,
                             help="Input a video sequence for offline processing.")
         parser.add_argument("-x", "--extractors", default="", type=str,
                             help="Set file-path of extractor Python file. p = start file prompt.")
@@ -75,7 +75,7 @@ class Arguments:
 
         self.markers = parsed_args.markers
         self.device = parsed_args.device
-        self.video = Path(parsed_args.video.strip("\'\"")).absolute()  # Handle quotes used in argument
+        self.video = "" if parsed_args.video == "" else Path(parsed_args.video.strip("\'\"")).absolute()  # Handle quotes used in argument
         self.output_dir = Path(parsed_args.output_dir.strip("\'\"")).absolute()
         self.source = parsed_args.source.lower()
         self.scale = parsed_args.scale

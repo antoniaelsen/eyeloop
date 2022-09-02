@@ -40,7 +40,7 @@ Finally, the `route()` function loads the video frames and passes them to the en
 def route(self) -> None:
         while True:
             image = ...
-            config.engine.update_feed(image)
+            self.on_frame(image) # Callback that will deliver the frame to the engine
             self.frame += 1
 ```
 

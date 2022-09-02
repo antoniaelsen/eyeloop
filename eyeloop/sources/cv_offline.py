@@ -1,6 +1,7 @@
 import logging
 import math
 from pathlib import Path
+import time
 from typing import Optional, Callable
 
 import cv2
@@ -10,26 +11,26 @@ from eyeloop.sources.source import Source
 
 logger = logging.getLogger(__name__)
 
+FRAME_RATE_COEFF = 0.5
 
-# TODO(aelsen): should really be broken out into live cam and video CV classes
-class CvSource(Source):
+class CvOfflineSource(Source):
     def __init__(self, on_frame) -> None:
         super().__init__(on_frame)
         self.route_frame: Optional[Callable] = None  # Dynamically assigned at runtime depending on input type
+        self.last_frame_time = time.time()
+        self.fps = 30
     
     def init(self) -> None:
         self.vid_path = Path(config.arguments.video)
 
-        # load first frame
-        if str(self.vid_path.name) == "0" or self.vid_path.is_file():  # or stream
-            if str(self.vid_path.name) == "0":
-                self.capture = cv2.VideoCapture(0)
-            else:
-                self.capture = cv2.VideoCapture(str(self.vid_path))
+        if self.vid_path.is_file():
+            self.capture = cv2.VideoCapture(str(self.vid_path))
 
             self.route_frame = self.route_cam
             width = self.capture.get(cv2.CAP_PROP_FRAME_WIDTH)
             height = self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
+            self.fps = self.capture.get(cv2.CAP_PROP_FPS)
+            logger.info(f"Video FPS: {self.fps}")
 
             _, image = self.capture.read()
             if self.capture.isOpened():
@@ -44,9 +45,7 @@ class CvSource(Source):
 
         elif self.vid_path.is_dir():
             config.file_manager.input_folderpath = self.vid_path
-
             config.file_manager.input_folderpath = self.vid_path
-
             image = config.file_manager.read_image(self.frame)
 
             try:
@@ -66,9 +65,16 @@ class CvSource(Source):
         return (width, height), image
 
     def route(self) -> None:
+        period = 1 / (self.fps * FRAME_RATE_COEFF)
         while True:
+            now = time.time()
+            if (now - self.last_frame_time < period):
+                continue
+
+            self.last_frame_time = now
             if self.route_frame is not None:
                 self.route_frame()
+            
             else:
                 break
 
@@ -93,7 +99,6 @@ class CvSource(Source):
         1: eyeloop for online processing
         2: frame save for offline processing
         """
-
         _, image = self.capture.read()
         if image is not None:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -103,7 +108,6 @@ class CvSource(Source):
             self.release()
 
     def release(self) -> None:
-        logger.debug(f"cv.Source.release() called")
         if self.capture is not None:
             self.capture.release()
 

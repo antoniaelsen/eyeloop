@@ -12,7 +12,7 @@ from eyeloop.engine.engine import Engine
 from eyeloop.extractors.DAQ import DaqExtractor
 from eyeloop.extractors.fps import FpsExtractor
 from eyeloop.guis.minimum.minimum_gui import GUI
-from eyeloop.sources.cv import CvSource
+from eyeloop.sources.cv_offline import CvOfflineSource
 from eyeloop.sources.cv_stream import CvStreamSource
 from eyeloop.utilities.argument_parser import Arguments
 from eyeloop.utilities.file_manager import File_Manager
@@ -33,7 +33,7 @@ class EyeLoop:
     """
 
     def __init__(self, args, logger=None):
-        welcome("Server")
+        welcome()
 
         self.engine = None
         self.gui = None
@@ -76,7 +76,8 @@ class EyeLoop:
         #    config.blink = np.load(f"{EYELOOP_DIR}/blink_.npy")[0] * .8
         #except:
         #    print("\n(!) NO BLINK DETECTION. Run 'eyeloop --blink 1' to calibrate\n")
-        self.engine = Engine(source=CvStreamSource, gui=GUI)
+        source = CvOfflineSource if config.arguments.video != "" else CvStreamSource
+        self.engine = Engine(source=source, gui=GUI)
         self.engine.load_extractors(self.load_extractors(config.arguments.extractors))
         self.engine.activate()
         self.engine.run()
