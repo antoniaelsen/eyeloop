@@ -14,6 +14,7 @@ opencv-python = "*"
 opencv-python-headless = "*"
 pillow = "*"
 numpy = "==1.23.2"
+pypylon = "*"
 
 [dev-packages]
 

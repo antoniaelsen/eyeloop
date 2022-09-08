@@ -58,7 +58,10 @@ One of EyeLoop's most appealing features is its modularity: Experiments are buil
 
 Requirements:
 
-- tkinter support (mac: `brew install python-tk`)
+- tkinter (mac: `brew install python-tk`, ubuntu `sudo apt-get install python3-tk`)
+- Optional:
+    - Pylon SDK
+    - Vimba SDK
 
 Install EyeLoop by cloning the repository:
 

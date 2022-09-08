@@ -60,7 +60,7 @@ class Arguments:
         parser.add_argument("--save", default=1, type=int,
                             help="Save video feed or not (yes/no, 1/0; default = 1)")
         parser.add_argument("--source", default="cv", type=str,
-                            help="Set source stream (cv, vimba, ...)")
+                            help="Set source stream (cv, pylon, vimba, ...)")
         parser.add_argument("--tracking", default=1, type=int,
                             help="Enable/disable tracking (1/enabled: default).")
 

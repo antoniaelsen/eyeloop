@@ -28,8 +28,9 @@ class CvStreamSource(Source):
         width = self.capture.get(cv2.CAP_PROP_FRAME_WIDTH)
         height = self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
 
-        live = False
         i = 0
+        image = None
+        live = False
         while (i < MAX_ATTEMPTS and not live):
             _, image = self.capture.read()
             live = np.any(image)

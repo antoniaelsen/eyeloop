@@ -395,7 +395,7 @@ class GUI:
         self.render_fps(frame, data)
 
         cv2.imshow(WINDOW_BINARY, np.vstack((self.bin_P, self.bin_CR)))
-        cv2.imshow(WINDOW_CONFIGURATION, frame_rgb)
+        cv2.imshow(WINDOW_CONFIGURATION, frame)
 
         key = cv2.waitKey(CV_IMAGE_PERIOD)
         self.key_listener(key)

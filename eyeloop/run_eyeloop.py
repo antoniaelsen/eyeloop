@@ -14,6 +14,7 @@ from eyeloop.extractors.fps import FpsExtractor
 from eyeloop.guis.minimum.minimum_gui import GUI
 from eyeloop.sources.cv_offline import CvOfflineSource
 from eyeloop.sources.cv_stream import CvStreamSource
+from eyeloop.sources.pylon import PylonSource
 from eyeloop.utilities.argument_parser import Arguments
 from eyeloop.utilities.file_manager import File_Manager
 from eyeloop.utilities.format_print import welcome
@@ -76,7 +77,12 @@ class EyeLoop:
         #    config.blink = np.load(f"{EYELOOP_DIR}/blink_.npy")[0] * .8
         #except:
         #    print("\n(!) NO BLINK DETECTION. Run 'eyeloop --blink 1' to calibrate\n")
-        source = CvOfflineSource if config.arguments.video != "" else CvStreamSource
+        source = None
+        if (config.arguments.video != ""):
+            source = CvOfflineSource
+        else:
+            source = PylonSource if config.arguments.source == "pylon" else CvStreamSource
+
         self.engine = Engine(source=source, gui=GUI)
         self.engine.load_extractors(self.load_extractors(config.arguments.extractors))
         self.engine.activate()
