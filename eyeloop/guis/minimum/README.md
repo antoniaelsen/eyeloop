@@ -10,7 +10,7 @@
 
 ## Getting started ##
 - **A**: Select the corneal reflections by hovering and key-pressing <kbd>2</kbd>, <kbd>3</kbd> or <kbd>4</kbd>. This initiates the tracking algorithm, which is rendered in the preview panel. Adjust binarization (key-press <kbd>W</kbd>/<kbd>S</kbd>) and gaussian (key-press <kbd>E</kbd>/<kbd>D</kbd>) parameters to improve detection. To switch between corneal reflections, key-press the corresponding index (for example, key-press <kbd>2</kbd> to modify corneal reflection "2").
-- **B**: Select the pupil by hovering and key-pressing <kbd>1</kbd>. Similar to the corneal reflections, this initiates tracking. Adjust binarization (key-press <kbd>R</kbd>/<kbd>F</kbd>) and gaussian parameters (key-press <kbd>T</kbd>/<kbd>G</kbd>) for optimal detection. 
+- **B**: Select the pupil by hovering and key-pressing <kbd>1</kbd>. Similar to the corneal reflections, this initiates tracking. Adjust binarization (key-press <kbd>R</kbd>/<kbd>F</kbd>) and gaussian parameters (key-press <kbd>T</kbd>/<kbd>G</kbd>) for optimal detection.
 - **C**: To initiate the eye-tracking trial, key-press <kbd>Z</kbd> and confirm by key-pressing <kbd>Y</kbd>.
 
 > Key-press "q" to stop tracking.

@@ -44,7 +44,7 @@ class Ellipse(Model):
         """
 
         x, y = r[:,0], r[:,1]
-        
+
 
         # Quadratic part of design matrix [eqn. 15] from (*)
 

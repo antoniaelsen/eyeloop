@@ -125,7 +125,7 @@ class GUI:
         cv2.moveWindow(WINDOW_BINARY, width, 0)
         cv2.moveWindow(WINDOW_CONFIGURATION, 0, 0)
         cv2.moveWindow(WINDOW_TOOLTIP, 0, height + 20)
- 
+
         self.add_mouse_events()
 
     def destroy(self):
@@ -139,6 +139,9 @@ class GUI:
             key = chr(key)
         except:
             return
+
+        if "q" == key:
+            self.on_quit()
 
         if self.inquiry == "track":
             if "y" == key:
@@ -241,8 +244,6 @@ class GUI:
                     self.pupil_processor.blur = [x - 2 for x in self.pupil_processor.blur]
                 print("Pupil blurring decreased (%s)." % self.pupil_processor.blur)
 
-        if "q" == key:
-            self.on_quit()
 
     def arm(self, image_dimensions, pupil_processor, cr_processors = []) -> None:
         self.frequency_track = np.round(1 / config.arguments.fps, 2)
@@ -292,7 +293,6 @@ class GUI:
         cv2.imshow(WINDOW_TOOLTIP, self.first_tool_tip)
 
     def draw_cross(self, source: np.ndarray, point: tuple, color: tuple) -> None:
-        # print(f"Draw cross: source {source}, point: {point}, color: {color}")
         source[to_int(point[1] - 3):to_int(point[1] + 4), to_int(point[0])] = color
         source[to_int(point[1]), to_int(point[0] - 3):to_int(point[0] + 4)] = color
 
@@ -324,14 +324,14 @@ class GUI:
         try:
             center, width, height, angle = params
             if (not center):
-                return False 
+                return False
             cv2.ellipse(frame_rgb, tuple_int(center), tuple_int((width, height)), angle, 0, 360, green, 1)
             self.draw_cross(frame_rgb, center, green)
             return True
         except Exception as e:
             logger.warn(f'Error processing corneal reflection #{index} - {e} {params}')
             return False
-    
+
     def generate_pupil_binarization(self):
         src = self.pupil_processor.src
         if (type(src) is not np.ndarray):
@@ -344,7 +344,7 @@ class GUI:
             offset_x:min(offset_x + src.shape[1], self.binary_width)] = src
         except Exception as e:
             logger.warn(f'Failed to calculate the binarized data for the pupil processor - {e}')
-            
+
     def generate_corneal_reflection_binarization(self):
         self.bin_CR = self.bin_stock.copy()
         src = self.cr_processors[self.cr_processor_index].src
@@ -360,13 +360,12 @@ class GUI:
         except Exception as e:
             logger.warn(f'Failed to calculate the binarized data for the corneal reflect processor - {src} {e}')
             self.bin_CR[0:20, 0:self.binary_width] = self.crstock_txt
-    
+
     def render_fps(self, frame, data):
         key = "FpsExtractor"
         if (not key in data):
             return
         fps = data[key]
-        # print(f"render fps {fps}")
         cv2.putText(frame, f'FPS: {fps}', (10, 15), font, .7, 1, 0, cv2.LINE_4)
 
     def update(self, frame, data):
@@ -376,6 +375,9 @@ class GUI:
             self.update_track(frame, data)
         else:
             self.update_configure(frame, data)
+
+        key = cv2.waitKey(CV_IMAGE_PERIOD)
+        self.key_listener(key)
 
     def update_configure(self, frame, data):
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
@@ -387,7 +389,7 @@ class GUI:
         else:
             self.bin_P[0:20, 0:self.binary_width] = self.bin_stock_txt
         self.generate_pupil_binarization()
-        
+
 
         self.draw_corneal_reflection(frame_rgb, self.cr_processor_index)
         self.generate_corneal_reflection_binarization()
@@ -397,15 +399,12 @@ class GUI:
         cv2.imshow(WINDOW_BINARY, np.vstack((self.bin_P, self.bin_CR)))
         cv2.imshow(WINDOW_CONFIGURATION, frame)
 
-        key = cv2.waitKey(CV_IMAGE_PERIOD)
-        self.key_listener(key)
+
         if self.first_run:
             self.first_run = False
 
     def update_record(self, frame_preview, data) -> None:
         cv2.imshow(WINDOW_RECORDING, frame_preview)
-        if cv2.waitKey(1) == ord('q'):
-            self.on_quit()
 
     def update_track(self, frame, data) -> None:
         diff = time.time() - self.last_time
@@ -422,6 +421,3 @@ class GUI:
         self.render_fps(frame_rgb, data)
         cv2.imshow(WINDOW_TRACKING, frame_rgb)
 
-
-        if cv2.waitKey(CV_IMAGE_PERIOD) == ord("q"):
-            self.on_quit()

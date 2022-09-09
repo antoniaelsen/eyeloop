@@ -1,8 +1,5 @@
 import logging
-import math
-from pathlib import Path
-import time
-from typing import Any, Optional, Callable
+from typing import Any
 
 import cv2
 import numpy as np
@@ -13,15 +10,25 @@ from eyeloop.sources.source import Source
 
 logger = logging.getLogger(__name__)
 
-MAX_ATTEMPTS = 100
+MAX_ATTEMPTS = 10
 
 class PylonSource(Source):
     def __init__(self, on_frame) -> None:
         super().__init__(on_frame)
+        self.active = False
 
     def __del__(self):
-        if (self.capture):
-            self.capture.Close()
+        self.release()
+
+
+    # class SampleImageEventHandler(pylon.ImageEventHandler):
+    #     def OnImageGrabbed(self, camera, result):
+    #         # print("CSampleImageEventHandler::OnImageGrabbed called.")
+    #         # print()
+    #         # print()
+    #         self.proceed.
+    #         pass
+
 
     def init(self) -> None:
         self.converter = pylon.ImageFormatConverter()
@@ -36,29 +43,34 @@ class PylonSource(Source):
         self.capture.Width.SetValue(640)
         self.capture.Height.SetValue(512)
 
+        self.capture.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
+
         i = 0
-        live = False
+
         image = None
-        while (i < MAX_ATTEMPTS and not live):
+        while (i < MAX_ATTEMPTS and not self.active):
             image = self.grab_image()
             print(f"Pix {image[0, 0]}")
             print(image)
-            live = np.any(image)
+            self.active = np.any(image)
             i += 1
 
-        if not (self.capture.IsOpen() and live):
+        if not (self.capture.IsOpen() and self.active):
             raise ValueError(
                 "Failed to initialize video stream.\n"
                 "Make sure that your camera is plugged in and compatible with pylon.")
-            
+
 
         width = self.capture.Width.GetValue()
         height = self.capture.Height.GetValue()
         print(f"Using Pylon device {self.capture.GetDeviceInfo().GetModelName()}: {width} x {height}")
+
+        # self.capture.RegisterImageEventHandler(, pylon.RegistrationMode_Append, pylon.Cleanup_Delete)
+        # self.capture.StartGrabbing(pylon.GrabStrategy_OneByOne, pylon.GrabLoop_ProvidedByInstantCamera)
         return (width, height), image
 
     def route(self) -> None:
-        while True:
+        while self.active:
             if self.route_frame is not None:
                 self.route_frame()
             else:
@@ -72,14 +84,12 @@ class PylonSource(Source):
         self.frame += 1
 
     def grab_image(self) -> Any:
-        TIMEOUT = 50
+        TIMEOUT = 10
 
-        self.capture.StartGrabbing(pylon.GrabStrategy_LatestImageOnly) 
-        ready = self.capture.WaitForFrameTriggerReady(1, pylon.TimeoutHandling_ThrowException)
+        self.capture.WaitForFrameTriggerReady(1, pylon.TimeoutHandling_ThrowException)
         self.capture.ExecuteSoftwareTrigger()
         result = self.capture.RetrieveResult(TIMEOUT, pylon.TimeoutHandling_Return)
 
-        self.capture.StopGrabbing()
         if not result.GrabSucceeded():
             return False
 
@@ -97,7 +107,9 @@ class PylonSource(Source):
         self.proceed(image)
 
     def release(self) -> None:
-        if self.capture is not None:
+        print(f'Pylon releasing...')
+        if (self.capture is not None):
+            self.capture.StopGrabbing()
             self.capture.Close()
         super().release()
 

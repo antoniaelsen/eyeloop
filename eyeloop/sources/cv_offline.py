@@ -19,7 +19,7 @@ class CvOfflineSource(Source):
         self.route_frame: Optional[Callable] = None  # Dynamically assigned at runtime depending on input type
         self.last_frame_time = time.time()
         self.fps = 30
-    
+
     def init(self) -> None:
         self.vid_path = Path(config.arguments.video)
 
@@ -74,7 +74,7 @@ class CvOfflineSource(Source):
             self.last_frame_time = now
             if self.route_frame is not None:
                 self.route_frame()
-            
+
             else:
                 break
 

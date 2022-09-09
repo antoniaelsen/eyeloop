@@ -8,8 +8,7 @@ import eyeloop.config as config
 from eyeloop.constants.engine_constants import *
 from eyeloop.engine.processor import CornealReflection, Pupil
 from eyeloop.sources.source import Source
-from eyeloop.utilities.general_operations import to_int, tuple_int
-from eyeloop.utilities.target_type import TargetType
+
 
 logger = logging.getLogger(__name__)
 PARAMS_DIR = f"{dirname(dirname(abspath(__file__)))}/engine/params"
@@ -26,10 +25,14 @@ class Engine:
         if (gui is not None):
             self.gui = gui(on_angle=self.update_angle, on_quit=self.release)
 
+        self.active = True
         self.extractors = []
         self.extractor_data = []
         self.state = State.RECORD if config.arguments.tracking == 0 else State.TRACK
+        self.blink_calibrated = False
         self.blink_active = False
+        self.blink = np.zeros(300, dtype=np.float64)
+        self.blink_i = 0
 
         self.frame_i = 0
         self.angle = 0
@@ -54,6 +57,8 @@ class Engine:
         """
         Releases/deactivates all running process, i.e., importers, extractors.
         """
+
+        self.active = False
         param_dict = {
             "pupil" : [self.pupil_processor.binarythreshold, self.pupil_processor.blur],
         }
@@ -123,9 +128,9 @@ class Engine:
 
         self.on_frame(image)
 
-        if config.arguments.blinkcalibration != "":
-            config.blink = np.load(config.arguments.blinkcalibration)
-            self.blink_sampled = lambda _:None
+        if config.arguments.blink_calibration_path != "":
+            self.blink = np.load(config.arguments.blink_calibration_path)
+            self.blink_calibrated = True
             logger.info("(success) blink calibration loaded")
 
         if config.arguments.clear == False or config.arguments.params != "":
@@ -149,7 +154,7 @@ class Engine:
 
             except:
                 pass
-            
+
         filtered_image = image[np.logical_and((image < 220), (image > 30))]
 
         self.pupil_processor.set_dimensions((width, height))
@@ -161,23 +166,32 @@ class Engine:
         param_dict = self.construct_param_dict()
         logger.info(f"loaded parameters:\n{param_dict}")
 
-    def blink_sampled(self, t:int = 1):
-        if t == 1:
-            if config.blink_i% 20 == 0:
-                print(f"calibrating blink detector {round(config.blink_i/config.blink.shape[0]*100,1)}%")
-        else:
-            logger.info("(success) blink detection calibrated")
-            path = f"{config.file_manager.new_folderpath}/blinkcalibration_{self.dataout['time']}.npy"
-            np.save(path, config.blink)
-            print("blink calibration file saved")
+    def blink_sampled(self, mean):
+        if self.blink_i % 20 == 0:
+            print(f"Calibrating blink detector - {round(self.blink_i / self.blink.shape[0] * 100, 1)}%")
+
+        if (self.blink_i == self.blink.shape[0]):
+            logger.info("Blink detection calibrated")
+            path = f"{config.file_manager.new_folderpath}/blink_calibration_path_{self.dataout['time']}.npy"
+            np.save(path, self.blink)
+            print(f" - calibration file saved to {path}")
+            self.blink_calibrated = True
+            return
+
+        self.blink[self.blink_i] = mean
+        self.blink_i += 1
 
     def on_frame(self, frame) -> None:
         self.frame_i += 1
+
+        if (self.active is False):
+            return
+
         if (self.state == State.RECORD):
             self.record(frame)
         else:
             self.track(frame)
-        
+
         self.run_extractors()
         if (self.gui is not None):
             self.gui.update(frame, self.extractor_data)
@@ -200,25 +214,19 @@ class Engine:
         Fourth, pupil is detected.
         Finally, data is logged and extractors are run.
         """
-        mean_img = np.mean(frame)
-        try:
-            config.blink[config.blink_i] = mean_img
-            config.blink_i += 1
-            self.blink_sampled(1)
-
-        except IndexError:
-            self.blink_sampled(0)
-            self.blink_sampled = lambda _:None
-            config.blink_i = 0
-
         self.dataout = {
             "time": time.time()
         }
+        mean_img = np.mean(frame)
 
-        # if np.abs(mean_img - np.mean(config.blink[np.nonzero(config.blink)])) > 10:
-        mean_blink = np.mean(config.blink)
+        if (not self.blink_calibrated):
+            self.blink_sampled(mean_img)
+            return
+
+        # if np.abs(mean_img - np.mean(self.blink[np.nonzero(self.blink)])) > 10:
+        mean_blink = np.mean(self.blink)
         is_blinking = np.abs(mean_img - mean_blink) > 10
-        # blinks_nonzero = config.blink[np.nonzero(config.blink)]
+        # blinks_nonzero = self.blink[np.nonzero(self.blink)]
         # if np.abs(mean_img - np.mean(blinks_nonzero)) > 10:
         if is_blinking:
             self.dataout["blink"] = 1

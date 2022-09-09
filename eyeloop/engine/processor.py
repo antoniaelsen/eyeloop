@@ -79,10 +79,10 @@ class Shape():
         self.corners = self.standard_corners.copy()
         self.active = True
         #self.tracker = cv2.TrackerMedianFlow_create()
-    
+
     def set_dimensions(self, dimms):
         self.src_dimms = dimms
-    
+
     def track(self, frame):
         if (not self.active):
             return

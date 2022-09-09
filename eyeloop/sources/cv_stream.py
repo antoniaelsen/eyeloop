@@ -17,7 +17,7 @@ MAX_ATTEMPTS = 100
 class CvStreamSource(Source):
     def __init__(self, on_frame) -> None:
         super().__init__(on_frame)
-    
+
     def init(self) -> None:
         self.camera_id = int(config.arguments.device)
         self.capture = cv2.VideoCapture(self.camera_id)
@@ -45,7 +45,7 @@ class CvStreamSource(Source):
             raise ValueError(
                 "Failed to initialize video stream.\n"
                 "Make sure that your webcam is plugged in and compatible with opencv.")
-            
+
 
         width = math.floor(width)
         height = math.floor(height)

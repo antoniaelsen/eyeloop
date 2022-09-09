@@ -9,7 +9,7 @@ import numpy as np
 
 import eyeloop.config as config
 from eyeloop.engine.engine import Engine
-from eyeloop.extractors.DAQ import DaqExtractor
+from eyeloop.extractors.log import LogExtractor
 from eyeloop.extractors.fps import FpsExtractor
 from eyeloop.guis.minimum.minimum_gui import GUI
 from eyeloop.sources.cv_offline import CvOfflineSource
@@ -44,13 +44,13 @@ class EyeLoop:
         config.file_manager = File_Manager(output_root=config.arguments.output_dir, img_format = config.arguments.img_format)
         if logger is None:
             logger, logger_filename = setup_logging(log_dir=config.file_manager.new_folderpath, module_name="run_eyeloop")
-        
+
         self.init()
 
     def load_extractors(self, file_path):
         fps_counter = FpsExtractor()
-        data_acquisition = DaqExtractor(config.file_manager.new_folderpath)
-        extractors = { "FpsExtractor": fps_counter, "DaqExtractor": data_acquisition }
+        log = LogExtractor(config.file_manager.new_folderpath)
+        extractors = { "FpsExtractor": fps_counter, "LogExtractor": log }
 
         if file_path == "p":
             root = tk.Tk()
@@ -73,24 +73,24 @@ class EyeLoop:
         return extractors
 
     def init(self):
-        #try:
-        #    config.blink = np.load(f"{EYELOOP_DIR}/blink_.npy")[0] * .8
-        #except:
-        #    print("\n(!) NO BLINK DETECTION. Run 'eyeloop --blink 1' to calibrate\n")
+        gui = None
+        if (config.arguments.gui == "minimal"):
+            gui = GUI
+
         source = None
         if (config.arguments.video != ""):
             source = CvOfflineSource
         else:
             source = PylonSource if config.arguments.source == "pylon" else CvStreamSource
 
-        self.engine = Engine(source=source, gui=GUI)
+        self.engine = Engine(source=source, gui=gui)
         self.engine.load_extractors(self.load_extractors(config.arguments.extractors))
         self.engine.activate()
         self.engine.run()
 
 
 def main():
-    app = EyeLoop(sys.argv[1:], logger=None)
+    EyeLoop(sys.argv[1:], logger=None)
 
 
 if __name__ == '__main__':
