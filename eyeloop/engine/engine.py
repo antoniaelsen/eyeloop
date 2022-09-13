@@ -166,7 +166,9 @@ class Engine:
         param_dict = self.construct_param_dict()
         logger.info(f"loaded parameters:\n{param_dict}")
 
-    def blink_sampled(self, mean):
+    def blink_sampled(self, frame):
+        mean = np.mean(frame)
+    
         if self.blink_i % 20 == 0:
             print(f"Calibrating blink detector - {round(self.blink_i / self.blink.shape[0] * 100, 1)}%")
 
@@ -176,10 +178,16 @@ class Engine:
             np.save(path, self.blink)
             print(f" - calibration file saved to {path}")
             self.blink_calibrated = True
+            self.blink_mean = np.mean(self.blink)
             return
 
         self.blink[self.blink_i] = mean
         self.blink_i += 1
+
+    def blink_detect(self, frame):
+        mean = np.mean(frame)
+        # return np.abs(mean - self.blink_mean) > 10
+        return np.abs(mean - np.mean(self.blink[np.nonzero(self.blink)])) > 10
 
     def on_frame(self, frame) -> None:
         self.frame_i += 1
@@ -217,17 +225,13 @@ class Engine:
         self.dataout = {
             "time": time.time()
         }
-        mean_img = np.mean(frame)
 
         if (not self.blink_calibrated):
-            self.blink_sampled(mean_img)
+            self.blink_sampled(frame)
             return
 
-        # if np.abs(mean_img - np.mean(self.blink[np.nonzero(self.blink)])) > 10:
-        mean_blink = np.mean(self.blink)
-        is_blinking = np.abs(mean_img - mean_blink) > 10
-        # blinks_nonzero = self.blink[np.nonzero(self.blink)]
-        # if np.abs(mean_img - np.mean(blinks_nonzero)) > 10:
+        is_blinking = self.blink_detect(frame)
+
         if is_blinking:
             self.dataout["blink"] = 1
             self.pupil_processor.fit_model.params = None

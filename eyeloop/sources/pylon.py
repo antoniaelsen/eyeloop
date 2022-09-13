@@ -50,9 +50,10 @@ class PylonSource(Source):
         image = None
         while (i < MAX_ATTEMPTS and not self.active):
             image = self.grab_image()
-            print(f"Pix {image[0, 0]}")
-            print(image)
-            self.active = np.any(image)
+            if (image is not None):
+                print(f"Pix {image[0, 0]}")
+                print(image)
+                self.active = np.any(image)
             i += 1
 
         if not (self.capture.IsOpen() and self.active):
@@ -86,12 +87,12 @@ class PylonSource(Source):
     def grab_image(self) -> Any:
         TIMEOUT = 10
 
-        self.capture.WaitForFrameTriggerReady(1, pylon.TimeoutHandling_ThrowException)
+        self.capture.WaitForFrameTriggerReady(1, pylon.TimeoutHandling_Return)
         self.capture.ExecuteSoftwareTrigger()
-        result = self.capture.RetrieveResult(TIMEOUT, pylon.TimeoutHandling_Return)
+        result = self.capture.RetrieveResult(1, pylon.TimeoutHandling_Return)
 
-        if not result.GrabSucceeded():
-            return False
+        if not result or not result.GrabSucceeded():
+            return None
 
         image = result.Array
 
@@ -104,6 +105,8 @@ class PylonSource(Source):
         2: frame save for offline processing
         """
         image = self.grab_image()
+        if (image is None):
+            return
         self.proceed(image)
 
     def release(self) -> None:

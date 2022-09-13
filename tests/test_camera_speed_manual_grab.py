@@ -33,7 +33,8 @@ if __name__ == '__main__':
                     cv2.waitKey(1)
 
             else:
-                print(f"frame trigger not ready")
+                # print(f"frame trigger not ready")
+                pass
 
     except genicam.GenericException as e:
         print("An exception occurred.", e.GetDescription())

@@ -144,7 +144,21 @@ class Pupil(Shape):
         return r[cond_]
 
     def apply_threshold(self, src):
-        src = cv2.threshold(cv2.GaussianBlur(cv2.erode(src, kernel, iterations = 1), self.blur, 0), self.binarythreshold, 255, cv2.THRESH_BINARY_INV)[1]
+        ERODE = False
+        input = src.copy()
+        if ERODE:
+            input = cv2.erode(input, kernel, iterations = 1)
+        
+        src = cv2.threshold(
+            cv2.GaussianBlur(
+                input,
+                self.blur,
+                0
+            ),
+            self.binarythreshold,
+            255,
+            cv2.THRESH_BINARY_INV
+        )[1]
         return src
 
     def on_fit_failure(self, src, src_raw):
@@ -275,7 +289,12 @@ class CornealReflection(Shape):
         # self.expand = 1.2 # old
 
     def apply_threshold(self, src):
-        _, src = cv2.threshold(cv2.GaussianBlur(src, self.blur, 0), self.binarythreshold, 255, cv2.THRESH_BINARY)
+        src = cv2.threshold(
+            cv2.GaussianBlur(src, self.blur, 0),
+            self.binarythreshold,
+            255,
+            cv2.THRESH_BINARY
+        )[1]
         return src
 
     def walkout(self, src):

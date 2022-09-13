@@ -23,6 +23,8 @@ WINDOW_TRACKING = "Tracking"
 WINDOW_RECORDING = "Recording"
 CV_IMAGE_PERIOD = 1
 
+WINDOW_BINARY_SCALE = 1 # percent of original size
+
 tooltips = {
     "0": {
         "name": "tip_1_cr_first",
@@ -255,8 +257,7 @@ class GUI:
 
         width, height = image_dimensions
         self.width, self.height = width, height
-        self.binary_width = max(width, 300)
-        self.binary_height = max(height, 200)
+        self.binary_size = (int(height * WINDOW_BINARY_SCALE), int(width * WINDOW_BINARY_SCALE))
 
         # Initialize windows
         self.init(width, height)
@@ -265,28 +266,9 @@ class GUI:
         output_vid = Path(config.file_manager.new_folderpath, "output.avi")
         self.out = cv2.VideoWriter(str(output_vid), fourcc, 50.0, (self.width, self.height))
 
-        self.bin_stock = np.zeros((self.binary_height, self.binary_width))
+        self.bin_stock = np.zeros(self.binary_size, np.uint8)
         self.bin_P = self.bin_stock.copy()
         self.bin_CR = self.bin_stock.copy()
-        #self.CRStock = self.bin_stock.copy()
-
-        self.src_txt = np.zeros((20, width, 3))
-        self.prev_txt = self.src_txt.copy()
-        cv2.putText(self.src_txt, 'Source', (15, 12), font, .7, (255, 255, 255), 0, cv2.LINE_4)
-        cv2.putText(self.prev_txt, 'Preview', (15, 12), font, .7, (255, 255, 255), 0, cv2.LINE_4)
-        cv2.putText(self.prev_txt, 'EyeLoop', (width - 50, 12), font, .5, (255, 255, 255), 0, cv2.LINE_8)
-
-        self.bin_stock_txt = np.zeros((20, self.binary_width))
-        self.bin_stock_txt_selected = self.bin_stock_txt.copy()
-        self.crstock_txt = self.bin_stock_txt.copy()
-        self.crstock_txt[0:1, 0:self.binary_width] = 1
-        self.crstock_txt_selected = self.crstock_txt.copy()
-
-        cv2.putText(self.bin_stock_txt, 'P | R/F | T/G || bin/blur', (10, 15), font, .7, 1, 0, cv2.LINE_4)
-        cv2.putText(self.bin_stock_txt_selected, '(*) P | R/F | T/G || bin/blur', (10, 15), font, .7, 1, 0, cv2.LINE_4)
-
-        cv2.putText(self.crstock_txt, 'CR | W/S | E/D || bin/blur', (10, 15), font, .7, 1, 0, cv2.LINE_4)
-        cv2.putText(self.crstock_txt_selected, '(*) CR | W/S | E/D || bin/blur', (10, 15), font, .7, 1, 0, cv2.LINE_4)
 
         cv2.imshow(WINDOW_CONFIGURATION, np.hstack((self.bin_stock, self.bin_stock)))
         cv2.imshow(WINDOW_BINARY, np.vstack((self.bin_stock, self.bin_stock)))
@@ -296,70 +278,50 @@ class GUI:
         source[to_int(point[1] - 3):to_int(point[1] + 4), to_int(point[0])] = color
         source[to_int(point[1]), to_int(point[0] - 3):to_int(point[0] + 4)] = color
 
-    def draw_pupil(self, frame_rgb):
-        params = self.pupil_processor.fit_model.params
-        if (params == None):
-            return
-
+    def draw_target(self, frame_rgb, params, color):
         try:
             center, width, height, angle = params
             if (not center):
                 return False
-            cv2.ellipse(frame_rgb, tuple_int(center), tuple_int((width, height)), angle, 0, 360, red, 1)
-            self.draw_cross(frame_rgb, center, red)
+            cv2.ellipse(frame_rgb, tuple_int(center), tuple_int((width, height)), angle, 0, 360, color, 1)
+            # self.draw_cross(frame_rgb, center, color)
             return True
         except Exception as e:
-            logger.info(f"pupil not found: {e} - {self.pupil_processor.fit_model.params}")
-            return False
-
-    def draw_corneal_reflection(self, frame_rgb, index):
-        if (index >= len(self.cr_processors)):
-            logger.warn(f'Error drawing corneal reflection #{index} - no processor')
-            return
-
-        params = self.cr_processors[index].fit_model.params
-        if (params == None):
-            return
-
-        try:
-            center, width, height, angle = params
-            if (not center):
-                return False
-            cv2.ellipse(frame_rgb, tuple_int(center), tuple_int((width, height)), angle, 0, 360, green, 1)
-            self.draw_cross(frame_rgb, center, green)
-            return True
-        except Exception as e:
-            logger.warn(f'Error processing corneal reflection #{index} - {e} {params}')
             return False
 
     def generate_pupil_binarization(self):
         src = self.pupil_processor.src
         if (type(src) is not np.ndarray):
+            self.bin_P = self.bin_stock.copy()
             return
 
+        self.bin_P = np.copy(src)
         try:
-            offset_y = int((self.binary_height - src.shape[0]) / 2)
-            offset_x = int((self.binary_width - src.shape[1]) / 2)
-            self.bin_P[offset_y:min(offset_y + src.shape[0], self.binary_height),
-            offset_x:min(offset_x + src.shape[1], self.binary_width)] = src
+            # offset_y = int((self.binary_height - src.shape[0]) / 2)
+            # offset_x = int((self.binary_width - src.shape[1]) / 2)
+            # self.bin_P[offset_y:min(offset_y + src.shape[0], self.binary_height),
+            # offset_x:min(offset_x + src.shape[1], self.binary_width)] = src
+            pass
+
         except Exception as e:
             logger.warn(f'Failed to calculate the binarized data for the pupil processor - {e}')
 
     def generate_corneal_reflection_binarization(self):
-        self.bin_CR = self.bin_stock.copy()
         src = self.cr_processors[self.cr_processor_index].src
         if (type(src) is not np.ndarray):
+            self.bin_CR = self.bin_stock.copy()
             return
 
+        self.bin_CR = np.copy(src)
         try:
-            offset_y = int((self.binary_height - src.shape[0]) / 2)
-            offset_x = int((self.binary_width - src.shape[1]) / 2)
-            self.bin_CR[offset_y:min(offset_y + src.shape[0], self.binary_height),
-            offset_x:min(offset_x + src.shape[1], self.binary_width)] = src
-            self.bin_CR[0:20, 0:self.binary_width] = self.crstock_txt_selected
+            # offset_y = int((self.binary_height - src.shape[0]) / 2)
+            # offset_x = int((self.binary_width - src.shape[1]) / 2)
+            # self.bin_CR[offset_y:min(offset_y + src.shape[0], self.binary_height),
+            # offset_x:min(offset_x + src.shape[1], self.binary_width)] = src
+            # self.bin_CR[0:20, 0:self.binary_width] = self.crstock_txt_selected
+            pass
         except Exception as e:
             logger.warn(f'Failed to calculate the binarized data for the corneal reflect processor - {src} {e}')
-            self.bin_CR[0:20, 0:self.binary_width] = self.crstock_txt
 
     def render_fps(self, frame, data):
         key = "FpsExtractor"
@@ -382,22 +344,28 @@ class GUI:
     def update_configure(self, frame, data):
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
 
-        self.bin_P = self.bin_stock.copy()
-
-        if self.draw_pupil(frame_rgb):
-            self.bin_P[0:20, 0:self.binary_width] = self.bin_stock_txt_selected
-        else:
-            self.bin_P[0:20, 0:self.binary_width] = self.bin_stock_txt
+        # Pupil
         self.generate_pupil_binarization()
+        self.bin_P_BGA = cv2.cvtColor(self.bin_P, cv2.COLOR_GRAY2BGR, 3)
+        pupil_params = self.pupil_processor.fit_model.params
+        if (pupil_params is not None):
+            self.draw_target(frame_rgb, pupil_params, red)
+            self.draw_target(self.bin_P_BGA, pupil_params, red)
+        cv2.putText(self.bin_P_BGA , 'P | R/F | T/G || bin/blur', (10, 15), font, .7, 1, 0, cv2.LINE_4)
 
-
-        self.draw_corneal_reflection(frame_rgb, self.cr_processor_index)
+        # Corneal Reflection
         self.generate_corneal_reflection_binarization()
+        self.bin_CR_BGA = cv2.cvtColor(self.bin_CR, cv2.COLOR_GRAY2BGR, 3)
+        cr_params = self.cr_processors[self.cr_processor_index].fit_model.params
+        if (cr_params is not None):
+            self.draw_target(frame_rgb, cr_params, green)
+            self.draw_target(self.bin_CR_BGA, cr_params, green)
+        cv2.putText(self.bin_CR_BGA, 'CR | W/S | E/D || bin/blur', (10, 15), font, .7, 1, 0, cv2.LINE_4)
 
-        self.render_fps(frame, data)
+        self.render_fps(frame_rgb, data)
 
-        cv2.imshow(WINDOW_BINARY, np.vstack((self.bin_P, self.bin_CR)))
-        cv2.imshow(WINDOW_CONFIGURATION, frame)
+        cv2.imshow(WINDOW_BINARY, np.concatenate((self.bin_P_BGA, self.bin_CR_BGA), axis=0))
+        cv2.imshow(WINDOW_CONFIGURATION, frame_rgb)
 
 
         if self.first_run:
