@@ -41,6 +41,9 @@ class Arguments:
         parser.add_argument("-g", "--gui", default="minimal", type=str,
                             help="Run the application with the chosen gui (minimal)")
 
+        parser.add_argument("-l", "--loop", default=1, type=int,
+                            help="Loop the specified video sequence.")
+
         parser.add_argument("-m", "--model", default="ellipsoid", type=str,
                             help="Set pupil model type (circular; ellipsoid = default).")
 
@@ -70,7 +73,7 @@ class Arguments:
         parser.add_argument("--markers", default=0, type=int,
                             help="Enable/disable artifact removing markers (0: disable/default; 1: enable)")
 
-        parser.add_argument("--save", default=1, type=int,
+        parser.add_argument("--save", default=0, type=int,
                             help="Save video feed or not (yes/no, 1/0; default = 1)")
 
         parser.add_argument("--source", default="cv", type=str,
@@ -132,6 +135,10 @@ class Arguments:
                 elif parameter == "import":
                     print("Source preset: ", parameter)
                     self.source = parameter
+
+                elif parameter == "loop":
+                    print("Loop preset: ", parameter)
+                    self.loop = parameter
 
                 elif parameter == "model":
                     print("Model preset: ", parameter)

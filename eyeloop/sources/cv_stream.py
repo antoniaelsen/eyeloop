@@ -58,13 +58,6 @@ class CvStreamSource(Source):
             else:
                 break
 
-    def proceed(self, image) -> None:
-        image = self.resize(image)
-        self.rotate_(image, self.angle)
-        self.on_frame(image)
-        self.save_(image)
-        self.frame += 1
-
     def route_frame(self) -> None:
         """
         Routes the capture frame to:

@@ -26,13 +26,18 @@ class CvOfflineSource(Source):
         if self.vid_path.is_file():
             self.capture = cv2.VideoCapture(str(self.vid_path))
 
-            self.route_frame = self.route_cam
-            width = self.capture.get(cv2.CAP_PROP_FRAME_WIDTH)
-            height = self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
+            # width = self.capture.get(cv2.CAP_PROP_FRAME_WIDTH)
+            # height = self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
             self.fps = self.capture.get(cv2.CAP_PROP_FPS)
+            self.route_frame = self.route_cam
             logger.info(f"Video FPS: {self.fps}")
 
             _, image = self.capture.read()
+            image = self.resize(image)
+            width = image.shape[1]
+            height = image.shape[0]
+            print(f"SHape: {image.shape}")
+
             if self.capture.isOpened():
                 try:
                     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -78,13 +83,6 @@ class CvOfflineSource(Source):
             else:
                 break
 
-    def proceed(self, image) -> None:
-        image = self.resize(image)
-        self.rotate_(image, self.angle)
-        self.on_frame(image)
-        self.save_(image)
-        self.frame += 1
-
     def route_sequence_sing(self) -> None:
         image = config.file_manager.read_image(self.frame)
         self.proceed(image[..., 0])
@@ -104,8 +102,12 @@ class CvOfflineSource(Source):
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             self.proceed(image)
         else:
-            logger.info("No more frames to process, exiting.")
-            self.release()
+            if config.arguments.loop:
+                self.capture.release()
+                self.capture = cv2.VideoCapture(str(self.vid_path))
+                logger.info("No more frames to process, restarting video.")
+            else:
+                logger.info("No more frames to process, exiting.")
 
     def release(self) -> None:
         if self.capture is not None:

@@ -40,8 +40,8 @@ class PylonSource(Source):
 
         self.capture.Open()
         self.capture.StopGrabbing()
-        self.capture.Width.SetValue(640)
-        self.capture.Height.SetValue(512)
+        # self.capture.Width.SetValue(640)
+        # self.capture.Height.SetValue(512)
 
         self.capture.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
 
@@ -76,13 +76,6 @@ class PylonSource(Source):
                 self.route_frame()
             else:
                 break
-
-    def proceed(self, image) -> None:
-        image = self.resize(image)
-        self.rotate_(image, self.angle)
-        self.on_frame(image)
-        self.save_(image)
-        self.frame += 1
 
     def grab_image(self) -> Any:
         TIMEOUT = 10

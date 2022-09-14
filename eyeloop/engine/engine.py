@@ -3,7 +3,9 @@ import logging
 import time
 from os.path import dirname, abspath
 import glob, os
+from pathlib import Path
 
+import cv2
 import eyeloop.config as config
 from eyeloop.constants.engine_constants import *
 from eyeloop.engine.processor import CornealReflection, Pupil
@@ -23,12 +25,17 @@ class Engine:
         self.source = source(on_frame=self.on_frame)
         self.gui = None
         if (gui is not None):
-            self.gui = gui(on_angle=self.update_angle, on_quit=self.release)
+            self.gui = gui(
+                on_angle=self.on_angle,
+                on_quit=self.release,
+                on_record=self.on_record
+            )
+        self.out = None
 
         self.active = True
         self.extractors = []
         self.extractor_data = []
-        self.state = State.RECORD if config.arguments.tracking == 0 else State.TRACK
+        self.state = State.RECORD if config.arguments.save == 1 else State.TRACK
         self.blink_calibrated = False
         self.blink_active = False
         self.blink = np.zeros(300, dtype=np.float64)
@@ -38,6 +45,7 @@ class Engine:
         self.angle = 0
         self.pupil_processor = Pupil()
         self.cr_processors = [CornealReflection(n = x) for x in range(2)]
+
 
     def activate(self) -> None:
         """
@@ -110,12 +118,13 @@ class Engine:
             param_dict[f'cr_{i}'] = [self.cr_processors[i].binarythreshold, self.cr_processors[i].blur]
         return param_dict
 
-    def update_angle(self, inc):
+    def on_angle(self, inc):
         self.angle += inc
         self.source.angle = self.angle # TODO(aelsen) not great
 
     def arm(self) -> None:
         (width, height), image = self.source.init()
+        print(f"Source: {(width, height)}")
         self.source.arm(width, height, image)
         if (self.gui is not None):
             self.gui.arm(
@@ -203,6 +212,18 @@ class Engine:
         self.run_extractors()
         if (self.gui is not None):
             self.gui.update(frame, self.extractor_data)
+    
+    def on_record(self, record) -> None:
+        if (record):
+            print(f"Creating video writer {(self.width, self.height)}")
+            fourcc = cv2.VideoWriter_fourcc(*'XVID')
+            output_vid = Path(config.file_manager.new_folderpath, "output.avi")
+            self.out = cv2.VideoWriter(str(output_vid), fourcc, 30.0, (self.width, self.height))
+            self.state = State.RECORD
+        else:
+            self.state = State.TRACK
+            if self.out:
+                self.out.release()
 
     def run(self) -> None:
         self.source.route()
@@ -211,7 +232,11 @@ class Engine:
         """
         Runs Core engine in record mode. Timestamps all frames in data output log.
         """
+        print(f"Recording {frame.shape}")
         self.dataout = { "time": time.time() }
+        self.out.write(
+            cv2.resize(frame, (self.width, self.height))
+        )
 
     def track(self, frame) -> None:
         """

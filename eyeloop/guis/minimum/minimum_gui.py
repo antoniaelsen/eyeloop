@@ -66,9 +66,9 @@ class GuiState(Enum):
     RECORDING = "RECORDING"
 
 class GUI:
-    def __init__(self, on_angle = None, on_center = None, on_quit = None) -> None:
+    def __init__(self, on_angle = None, on_quit = None, on_record = None) -> None:
         self.on_angle = on_angle
-        self.on_center = on_center
+        self.on_record = on_record
         self.on_quit = on_quit
         self.tooltips = tooltips.copy()
         dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -85,8 +85,6 @@ class GUI:
         self.cr_index = 0
         self.cr_processor_index = 0
         self.cr_processors = []
-
-        self.out = None
 
     def release(self):
         cv2.destroyAllWindows()
@@ -130,11 +128,21 @@ class GUI:
 
         self.add_mouse_events()
 
+        self.bin_stock = np.zeros(self.binary_size, np.uint8)
+        self.bin_P = self.bin_stock.copy()
+        self.bin_CR = self.bin_stock.copy()
+
+        cv2.imshow(WINDOW_CONFIGURATION, np.hstack((self.bin_stock, self.bin_stock)))
+        cv2.imshow(WINDOW_BINARY, np.vstack((self.bin_stock, self.bin_stock)))
+        cv2.imshow(WINDOW_TOOLTIP, self.first_tool_tip)
+
+
     def destroy(self):
         self.remove_mouse_events()
         cv2.destroyWindow(WINDOW_CONFIGURATION)
         cv2.destroyWindow(WINDOW_BINARY)
         cv2.destroyWindow(WINDOW_TOOLTIP)
+
 
     def key_listener(self, key: int) -> None:
         try:
@@ -145,6 +153,45 @@ class GUI:
         if "q" == key:
             self.on_quit()
 
+        if "c" == key:
+            action = "recording" if self._state == GuiState.RECORDING else "tracking"
+            print(f"Stop {action}? (y/n)")
+            self.inquiry = "configure"
+
+        if self.inquiry == "configure":
+            if "y" == key:
+                print("Configuring..")
+
+                self.init(self.width, self.height)
+                self._state = GuiState.CONFIGURATION
+                self.on_record(False)
+                self.inquiry = "none"
+                return
+
+            elif "n" == key:
+                print("Adjustments resumed.")
+                self._state = GuiState.CONFIGURATION
+                self.inquiry = "none"
+                return
+
+        if self.inquiry == "record":
+            if "y" == key:
+                print("Initiating recording..")
+                self.destroy()
+
+                cv2.imshow(WINDOW_RECORDING, self.bin_stock)
+
+                self._state = GuiState.RECORDING
+                self.on_record(True)
+                self.inquiry = "none"
+                return
+
+            elif "n" == key:
+                print("Adjustments resumed.")
+                self._state = GuiState.CONFIGURATION
+                self.inquiry = "none"
+                return
+            
         if self.inquiry == "track":
             if "y" == key:
                 print("Initiating tracking..")
@@ -207,6 +254,10 @@ class GUI:
                     print("Hover and click on the corneal reflex, then press 3.")
 
 
+            elif "x" == key:
+                print("Start recording? (y/n)")
+                self.inquiry = "record"
+
             elif "z" == key:
                 print("Start tracking? (y/n)")
                 self.inquiry = "track"
@@ -261,18 +312,6 @@ class GUI:
 
         # Initialize windows
         self.init(width, height)
-
-        fourcc = cv2.VideoWriter_fourcc(*'MPEG')
-        output_vid = Path(config.file_manager.new_folderpath, "output.avi")
-        self.out = cv2.VideoWriter(str(output_vid), fourcc, 50.0, (self.width, self.height))
-
-        self.bin_stock = np.zeros(self.binary_size, np.uint8)
-        self.bin_P = self.bin_stock.copy()
-        self.bin_CR = self.bin_stock.copy()
-
-        cv2.imshow(WINDOW_CONFIGURATION, np.hstack((self.bin_stock, self.bin_stock)))
-        cv2.imshow(WINDOW_BINARY, np.vstack((self.bin_stock, self.bin_stock)))
-        cv2.imshow(WINDOW_TOOLTIP, self.first_tool_tip)
 
     def draw_cross(self, source: np.ndarray, point: tuple, color: tuple) -> None:
         source[to_int(point[1] - 3):to_int(point[1] + 4), to_int(point[0])] = color
@@ -371,8 +410,10 @@ class GUI:
         if self.first_run:
             self.first_run = False
 
-    def update_record(self, frame_preview, data) -> None:
-        cv2.imshow(WINDOW_RECORDING, frame_preview)
+    def update_record(self, frame, data) -> None:
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+        self.render_fps(frame_rgb, data)
+        cv2.imshow(WINDOW_RECORDING, frame_rgb)
 
     def update_track(self, frame, data) -> None:
         diff = time.time() - self.last_time
@@ -382,9 +423,16 @@ class GUI:
 
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
 
-        self.draw_pupil(frame_rgb)
+        pupil_params = self.pupil_processor.fit_model.params
+        if (pupil_params is not None):
+            self.draw_target(frame_rgb, pupil_params, red)
+            self.draw_target(self.bin_P_BGA, pupil_params, red)
+
         for i in range(len(self.cr_processors)):
-            self.draw_corneal_reflection(frame_rgb, i)
+            cr_params = self.cr_processors[i].fit_model.params
+            if (cr_params is not None):
+                self.draw_target(frame_rgb, cr_params, green)
+                self.draw_target(self.bin_CR_BGA, cr_params, green)
 
         self.render_fps(frame_rgb, data)
         cv2.imshow(WINDOW_TRACKING, frame_rgb)
